@@ -172,6 +172,7 @@
 #endif
             auto emu = sogen::create_x86_64_emulator(backend, 1);
             sogen::utils::log_ios_device_milestone("[milestone] after create_x86_64_emulator");
+            [weakSelf appendLog:(backend == sogen::backend_type::fex) ? @"[sogen] backend: fex" : @"[sogen] backend: unicorn"];
 
             sogen::utils::log_ios_device_milestone("[milestone] before windows_emulator constructor");
             auto win_emu = std::make_unique<sogen::windows_emulator>(
