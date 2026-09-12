@@ -99,12 +99,12 @@ targets:
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
         LIBRARY_SEARCH_PATHS[sdk=iphoneos*]:
           - "$(SOGEN_ROOT)/build/ios-embed-device/artifacts"
-          # FEXCore's own private static dependencies (fmt, xxhash, cephes, SoftFloat-3e) --
-          # CMake's ExternalProject build tree for FEX, not copied into artifacts/ since
-          # only libFEXCore.a itself is a build output sogen's own CMake exposes. Xcode links
-          # directly against archives rather than through CMake's target graph, so these need
-          # to be reachable here too or FEXCore.a is left with unresolved symbols (e.g.
-          # XXH3_64bits) at final link time.
+          # FEXCore's own private static dependencies (fmt, xxhash, cephes, SoftFloat-3e,
+          # JemallocLibs) -- CMake's ExternalProject build tree for FEX, not copied into
+          # artifacts/ since only libFEXCore.a itself is a build output sogen's own CMake
+          # exposes. Xcode links directly against archives rather than through CMake's target
+          # graph, so these need to be reachable here too or FEXCore.a is left with unresolved
+          # symbols (e.g. XXH3_64bits, FEXCore::Allocator::malloc) at final link time.
           - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/FEXCore/Source"
           - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/xxhash/cmake_unofficial"
           - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/fmt"
@@ -120,7 +120,7 @@ targets:
         OTHER_LDFLAGS: >-
           -lwindows-emulator -lbackend-selection -lunicorn-emulator -lunicorn
           -lunicorn-common -lx86_64-softmmu -lemulator -lemulator-common
-          -lfex-emulator -lFEXCore -lFEXCore_Base -lxxhash -lfmt -lcephes_128bit -lsoftfloat_3e
+          -lfex-emulator -lFEXCore -lFEXCore_Base -lJemallocLibs -lxxhash -lfmt -lcephes_128bit -lsoftfloat_3e
           -lminidump -lzstd -lfreetype -lSDL3 -liconv
           -Wl,-export_dynamic
         OTHER_LDFLAGS[sdk=iphoneos*]: >-
