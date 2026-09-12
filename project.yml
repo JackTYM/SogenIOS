@@ -60,6 +60,9 @@ targets:
         CLANG_CXX_LANGUAGE_STANDARD: "c++20"
         CLANG_CXX_LIBRARY: "libc++"
         CLANG_ENABLE_OBJC_ARC: YES
+        # Developer toggle: uncomment to construct the FEX backend instead of Unicorn in
+        # SogenBridge.mm (see SOGEN_IOS_USE_FEX there). Unset by default.
+        # GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1"]
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
         # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the
         # app still dlsym()s vkGetInstanceProcAddr out of its own image, so nothing MoltenVK
@@ -94,11 +97,30 @@ targets:
           - "$(SOGEN_ROOT)/src/backend-selection"
         # The simulator archives are arm64-only (see cmake/toolchain/ios-simulator.cmake).
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
-        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: "$(SOGEN_ROOT)/build/ios-embed-device/artifacts"
-        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: "$(SOGEN_ROOT)/build/ios-embed-simulator/artifacts"
+        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]:
+          - "$(SOGEN_ROOT)/build/ios-embed-device/artifacts"
+          # FEXCore's own private static dependencies (fmt, xxhash, cephes, SoftFloat-3e) --
+          # CMake's ExternalProject build tree for FEX, not copied into artifacts/ since
+          # only libFEXCore.a itself is a build output sogen's own CMake exposes. Xcode links
+          # directly against archives rather than through CMake's target graph, so these need
+          # to be reachable here too or FEXCore.a is left with unresolved symbols (e.g.
+          # XXH3_64bits) at final link time.
+          - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/FEXCore/Source"
+          - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/xxhash/cmake_unofficial"
+          - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/fmt"
+          - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/cephes"
+          - "$(SOGEN_ROOT)/build/ios-embed-device/deps/fex_external-prefix/src/fex_external-build/External/SoftFloat-3e"
+        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]:
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/artifacts"
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/deps/fex_external-prefix/src/fex_external-build/FEXCore/Source"
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/deps/fex_external-prefix/src/fex_external-build/External/xxhash/cmake_unofficial"
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/deps/fex_external-prefix/src/fex_external-build/External/fmt"
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/deps/fex_external-prefix/src/fex_external-build/External/cephes"
+          - "$(SOGEN_ROOT)/build/ios-embed-simulator/deps/fex_external-prefix/src/fex_external-build/External/SoftFloat-3e"
         OTHER_LDFLAGS: >-
           -lwindows-emulator -lbackend-selection -lunicorn-emulator -lunicorn
           -lunicorn-common -lx86_64-softmmu -lemulator -lemulator-common
+          -lfex-emulator -lFEXCore -lFEXCore_Base -lxxhash -lfmt -lcephes_128bit -lsoftfloat_3e
           -lminidump -lzstd -lfreetype -lSDL3 -liconv
           -Wl,-export_dynamic
         OTHER_LDFLAGS[sdk=iphoneos*]: >-

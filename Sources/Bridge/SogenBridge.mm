@@ -165,7 +165,12 @@
             };
 
             sogen::utils::log_ios_device_milestone("[milestone] before create_x86_64_emulator");
-            auto emu = sogen::create_x86_64_emulator(sogen::backend_type::unicorn, 1);
+#if defined(SOGEN_IOS_USE_FEX)
+            const auto backend = sogen::backend_type::fex;
+#else
+            const auto backend = sogen::backend_type::unicorn;
+#endif
+            auto emu = sogen::create_x86_64_emulator(backend, 1);
             sogen::utils::log_ios_device_milestone("[milestone] after create_x86_64_emulator");
 
             sogen::utils::log_ios_device_milestone("[milestone] before windows_emulator constructor");
