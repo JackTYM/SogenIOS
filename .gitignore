@@ -1,0 +1,13 @@
+SogenIOS.xcodeproj/
+Generated-Info.plist
+build/
+build-unsigned/
+ipa-stage/
+DerivedData/
+*.ipa
+*.app/
+Resources/*.exe
+# The user's own device-pairing credential -- sensitive, machine-specific, never committed.
+# (Also present inside build-unsigned/ and ipa-stage/ build output, already excluded above.)
+Resources/*.plist
+Vendor/

@@ -1,0 +1,211 @@
+name: SogenIOS
+options:
+  bundleIdPrefix: com.jacksonyarger
+  deploymentTarget:
+    iOS: "14.0"
+  createIntermediateGroups: true
+
+targets:
+  SogenIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    dependencies:
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: QuartzCore.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreMotion.framework
+      - sdk: CoreHaptics.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: GameController.framework
+      - sdk: Metal.framework
+      - sdk: IOSurface.framework
+      - sdk: OpenGLES.framework
+      - sdk: Security.framework
+      - sdk: UserNotifications.framework
+      # JIT-grant machinery (Sources/JIT/), ported from the out-of-tree JIT spike
+      # (.worktrees/ios-jit-test/tools/ios-jit-test/) so Unicorn's own TCG JIT can
+      # execute on real hardware -- see Sources/JIT/JITGate.swift.
+      - sdk: ExtensionFoundation.framework
+      - sdk: NetworkExtension.framework
+      - target: JITHelper
+        embed: true
+      - target: TunnelExtension
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios
+        # The only Apple Development identity present in this Mac's keychain (security
+        # find-identity -v -p codesigning). CODE_SIGN_STYLE: Automatic still needs an Apple ID
+        # signed into Xcode's own Accounts preferences to actually fetch/create a matching
+        # provisioning profile -- that part is interactive-only and isn't set by this file.
+        DEVELOPMENT_TEAM: 8FNAJHU49V
+        PRODUCT_NAME: SogenIOS
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: SogenIOS.entitlements
+        # Required on the host AND on JITHelper below -- missing it on either side
+        # makes AppExtensionPoint.Monitor fail at runtime with "Failed to add observer".
+        EX_ENABLE_EXTENSION_POINT_GENERATION: YES
+        CLANG_CXX_LANGUAGE_STANDARD: "c++20"
+        CLANG_CXX_LIBRARY: "libc++"
+        CLANG_ENABLE_OBJC_ARC: YES
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
+        # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the
+        # app still dlsym()s vkGetInstanceProcAddr out of its own image, so nothing MoltenVK
+        # brings in may be dead-stripped. Task 5 adds -force_load; this keeps it reachable.
+        DEAD_CODE_STRIPPING: NO
+        # Xcode's own "Strip Linked Product" archive phase removes vkGetInstanceProcAddr (and
+        # anything else only reached via a runtime dlsym() call, never a real relocation) even
+        # with -export_dynamic in place -- confirmed empirically: present in the unstripped
+        # Debug-iphoneos build product, absent from the stripped Release archive. Restricting the
+        # link to an explicit -exported_symbols_list (tried first) is the textbook fix per
+        # strip(1)'s own man page, but this is a Swift/ObjC/C++ app: that list would also have to
+        # cover every Swift metadata/runtime symbol, every libc++ exception-handling symbol, etc.,
+        # and missing even one broke the archive outright. This isn't an App Store build (it's
+        # manually resigned for sideloading), so simply not stripping is the safe, correct choice
+        # here -- a larger binary costs nothing for that use case.
+        STRIP_INSTALLED_PRODUCT: NO
+        # Recent Xcode Debug builds split the app into a tiny stub executable plus a
+        # SogenIOS.debug.dylib, loaded only when Xcode's own debugger attaches at launch.
+        # A bare `xcrun simctl launch` never triggers that load, so the real app code (and
+        # this emulator) would never run. Disable the split so the built app is self-contained.
+        ENABLE_DEBUG_DYLIB: NO
+        # Repo root, two levels up from tools/sogen-ios.
+        SOGEN_ROOT: "$(SRCROOT)/../.."
+        HEADER_SEARCH_PATHS:
+          - "$(SRCROOT)/Sources"
+          - "$(SRCROOT)/Sources/Bridge"
+          - "$(SOGEN_ROOT)/src"
+          - "$(SOGEN_ROOT)/src/windows-emulator"
+          - "$(SOGEN_ROOT)/src/emulator"
+          - "$(SOGEN_ROOT)/src/emulator-platform"
+          - "$(SOGEN_ROOT)/src/common"
+          - "$(SOGEN_ROOT)/src/backend-selection"
+        # The simulator archives are arm64-only (see cmake/toolchain/ios-simulator.cmake).
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
+        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: "$(SOGEN_ROOT)/build/ios-embed-device/artifacts"
+        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: "$(SOGEN_ROOT)/build/ios-embed-simulator/artifacts"
+        OTHER_LDFLAGS: >-
+          -lwindows-emulator -lbackend-selection -lunicorn-emulator -lunicorn
+          -lunicorn-common -lx86_64-softmmu -lemulator -lemulator-common
+          -lminidump -lzstd -lfreetype -lSDL3 -liconv
+          -Wl,-export_dynamic
+        OTHER_LDFLAGS[sdk=iphoneos*]: >-
+          $(inherited)
+          -force_load $(SRCROOT)/Vendor/MoltenVK/ios-device/libMoltenVK.a
+        OTHER_LDFLAGS[sdk=iphonesimulator*]: >-
+          $(inherited)
+          -force_load $(SRCROOT)/Vendor/MoltenVK/ios-simulator/libMoltenVK.a
+    info:
+      path: Generated-Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+
+  # StikJIT (MPL-2.0, https://github.com/StikDebug/StikJIT), vendored from source under
+  # Vendor/StikJIT-src -- ported verbatim from the JIT spike's project.yml. Built from
+  # source rather than the prebuilt xcframework release because the release's private
+  # Swift module interface predates this Xcode toolchain and private interfaces aren't
+  # guaranteed to be portable across compiler versions.
+  StikJIT:
+    type: framework
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: Vendor/StikJIT-src/Sources
+      - path: Vendor/StikJIT-src/Resources
+        buildPhase: resources
+    dependencies:
+      - sdk: JavaScriptCore.framework
+      - sdk: Network.framework
+      - sdk: Security.framework
+      - sdk: CFNetwork.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: IOKit.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios.StikJIT
+        PRODUCT_NAME: StikJIT
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        BUILD_LIBRARY_FOR_DISTRIBUTION: YES
+        SKIP_INSTALL: NO
+        SWIFT_INCLUDE_PATHS: "$(SRCROOT)/Vendor/StikJIT-src/idevice $(SRCROOT)/Vendor/StikJIT-src/iokit"
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/Vendor/StikJIT-src/idevice $(SRCROOT)/Vendor/StikJIT-src/iokit"
+        LIBRARY_SEARCH_PATHS: "$(SRCROOT)/Vendor/StikJIT-src/idevice"
+        OTHER_LDFLAGS: "-force_load $(SRCROOT)/Vendor/StikJIT-src/idevice/libidevice_ffi.a"
+        CODE_SIGN_STYLE: Automatic
+        # libidevice_ffi.a is a real-device-only prebuilt archive (see Vendor/StikJIT-src) --
+        # not just x86_64-incompatible, its object files are built for the iOS platform variant,
+        # not iOS-simulator, so even an arm64 Simulator build fails to link it (confirmed
+        # empirically: "building for iOS-simulator, but linking in object file ... built for
+        # iOS"). SUPPORTED_PLATFORMS excludes Simulator entirely, for both architectures, rather
+        # than just x86_64 (which alone doesn't help on an Apple Silicon Mac's arm64 Simulator).
+        SUPPORTED_PLATFORMS: "iphoneos"
+
+  # ExtensionKit app extension: runs StikJIT.enableJIT against the host app's own PID,
+  # reached from the host via AppExtensionPoint/AppExtensionProcess/XPCSession (iOS 26+).
+  JITHelper:
+    type: extensionkit-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: HelperExtension
+      - path: Sources/JIT/JITBridge
+    dependencies:
+      - target: StikJIT
+        embed: true
+      - sdk: ExtensionFoundation.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios.JITHelper
+        PRODUCT_NAME: JITHelper
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: HelperExtension/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        EX_ENABLE_EXTENSION_POINT_GENERATION: YES
+        CODE_SIGN_STYLE: Automatic
+        # Depends on StikJIT (above), which is real-device-only for the same reason.
+        SUPPORTED_PLATFORMS: "iphoneos"
+
+  # NEPacketTunnelProvider app extension: a loopback NAT rewrite so JITHelper can reach the
+  # device's own developer services without a separately-installed VPN app. NOTE: requires
+  # the com.apple.developer.networking.networkextension entitlement, which Apple does not
+  # grant to free personal-team accounts (confirmed by the JIT spike's own README) -- this
+  # target will fail to sign under Task 7's ordinary personal-team setup unless the signed-in
+  # account has NetworkExtension capability approved.
+  TunnelExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TunnelExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios.TunnelExtension
+        PRODUCT_NAME: TunnelExtension
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: TunnelExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: TunnelExtension/TunnelExtension.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_STYLE: Automatic
