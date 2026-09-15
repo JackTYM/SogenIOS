@@ -1,8 +1,10 @@
 name: SogenIOS
 options:
   bundleIdPrefix: com.jacksonyarger
+  # Xcode 27's iPhoneOS SDK libc++ headers hard-error (unsupported-platform #warning as -Werror)
+  # below iOS 15.0 - this was 14.0 until that toolchain update.
   deploymentTarget:
-    iOS: "14.0"
+    iOS: "15.0"
   createIntermediateGroups: true
 
 targets:
