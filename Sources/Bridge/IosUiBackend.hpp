@@ -1,5 +1,6 @@
 #pragma once
 
+#import <CoreGraphics/CoreGraphics.h>
 #import <QuartzCore/QuartzCore.h>
 
 #include <platform/ui_backend.hpp>
@@ -75,6 +76,13 @@ namespace sogen
         };
 
         CALayer* layer_{};
+        // Retained (CGImageRetain), not ARC-managed: CGImageRef is a CF type. Cached so
+        // set_layer() can immediately paint a newly-attached layer, since the guest may already
+        // have finished presenting every frame to the OLD layer before the new one is attached
+        // (EmulationView's real layer only exists once its view appears, which can trail well
+        // behind SetupView already having started a fast-running guest against its own
+        // placeholder layer).
+        CGImageRef last_image_{};
         event_sink event_sink_{};
         raw_mouse_sink raw_mouse_sink_{};
         mouse_move_sink mouse_move_sink_{};

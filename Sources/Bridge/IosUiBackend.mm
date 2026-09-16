@@ -23,7 +23,13 @@ namespace sogen
     {
     }
 
-    ios_ui_backend::~ios_ui_backend() = default;
+    ios_ui_backend::~ios_ui_backend()
+    {
+        if (this->last_image_ != nullptr)
+        {
+            CGImageRelease(this->last_image_);
+        }
+    }
 
     void ios_ui_backend::set_event_sink(event_sink sink)
     {
@@ -57,8 +63,30 @@ namespace sogen
 
     void ios_ui_backend::set_layer(CALayer* layer)
     {
-        const std::lock_guard<std::mutex> lock(this->mutex_);
-        this->layer_ = layer;
+        CGImageRef cached_image = nullptr;
+        {
+            const std::lock_guard<std::mutex> lock(this->mutex_);
+            this->layer_ = layer;
+            cached_image = this->last_image_;
+            if (cached_image != nullptr)
+            {
+                CGImageRetain(cached_image);
+            }
+        }
+
+        if (cached_image == nullptr)
+        {
+            return;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [CATransaction begin];
+          [CATransaction setDisableActions:YES];
+          layer.magnificationFilter = kCAFilterNearest;
+          layer.contents = (__bridge id)cached_image;
+          [CATransaction commit];
+          CGImageRelease(cached_image);
+        });
     }
 
     void ios_ui_backend::emit_log(const char* format, ...) const
@@ -244,12 +272,21 @@ namespace sogen
         }
 
         CALayer* layer;
+        CGImageRef previous_last_image;
         {
             // set_layer() can re-point layer_ from the UI thread while this runs on the emulator
-            // thread -- must read it under mutex_.
+            // thread -- must read/write both under mutex_.
             const std::lock_guard<std::mutex> lock(this->mutex_);
             layer = this->layer_;
+            previous_last_image = this->last_image_;
+            this->last_image_ = image;
+            CGImageRetain(this->last_image_);
         }
+        if (previous_last_image != nullptr)
+        {
+            CGImageRelease(previous_last_image);
+        }
+
         dispatch_async(dispatch_get_main_queue(), ^{
           [CATransaction begin];
           [CATransaction setDisableActions:YES];
