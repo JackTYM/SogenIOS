@@ -3,41 +3,106 @@ import UIKit
 
 struct EmulationView: View {
     let emulator: SogenEmulator
+    let logLines: [String]
     @Environment(\.dismiss) private var dismiss
 
     @State private var mode: MouseMode = .touchscreen
     @State private var frameSize: CGSize = .zero
+    @State private var showLogs = false
+    @State private var showKeyboard = false
+
+    private var guestAspectRatio: CGFloat {
+        guard frameSize.width > 0, frameSize.height > 0 else { return 320.0 / 180.0 }
+        return frameSize.width / frameSize.height
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            EmulatorView(
-                onViewReady: { layer in
-                    emulator.attach(layer)
-                },
-                mode: mode,
-                frameSize: frameSize,
-                onDeliverMove: { point in emulator.deliverMouseMove(point) },
-                onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
-                onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
-                onDeliverClick: { emulator.deliverTap() },
-                onDeliverRightClick: { emulator.deliverRightClick() }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: {
-                    emulator.stop()
-                    dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
+        GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
+
+            ZStack(alignment: .top) {
+                if isLandscape {
+                    guestView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 0) {
+                        guestView
+                            .aspectRatio(guestAspectRatio, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                        Color.clear
+                            .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 220)
+                    }
+                }
+
+                topBar
+                    .padding(8)
+                    .background(isLandscape ? Color.black.opacity(0.4) : Color.clear)
+
+                if showLogs {
+                    LogsOverlayView(logLines: logLines, onClose: { showLogs = false })
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
+        .navigationBarBackButtonHidden(true)
+        .background(Color.black)
         .onAppear {
             emulator.onFrameSize = { size in
                 frameSize = size
+            }
+        }
+    }
+
+    private var guestView: some View {
+        EmulatorView(
+            onViewReady: { layer in
+                emulator.attach(layer)
+            },
+            mode: mode,
+            frameSize: frameSize,
+            onDeliverMove: { point in emulator.deliverMouseMove(point) },
+            onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
+            onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
+            onDeliverClick: { emulator.deliverTap() },
+            onDeliverRightClick: { emulator.deliverRightClick() }
+        )
+    }
+
+    private var topBar: some View {
+        HStack {
+            Button(action: {
+                emulator.stop()
+                dismiss()
+            }) {
+                Image(systemName: "chevron.left")
+                    .padding(6)
+                    .background(Color.black.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                Button(action: {
+                    mode = (mode == .touchscreen) ? .trackpad : .touchscreen
+                }) {
+                    Image(systemName: mode == .touchscreen ? "hand.tap" : "cursorarrow.motionlines")
+                        .padding(6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                Button(action: { showLogs.toggle() }) {
+                    Image(systemName: "doc.text")
+                        .padding(6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                Button(action: { showKeyboard.toggle() }) {
+                    Image(systemName: "keyboard")
+                        .padding(6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
             }
         }
     }

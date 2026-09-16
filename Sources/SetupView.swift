@@ -111,7 +111,7 @@ struct SetupView: View {
         }
         .navigationDestination(isPresented: $didBoot) {
             if let emulator = bootedEmulator {
-                EmulationView(emulator: emulator)
+                EmulationView(emulator: emulator, logLines: logLines)
             }
         }
     }
