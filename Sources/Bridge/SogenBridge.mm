@@ -5,6 +5,8 @@
 #include <backend_selection.hpp>
 #include <utils/ios_device_log.hpp>
 
+#include <TargetConditionals.h>
+#include <cstdlib>
 #include <exception>
 #include <memory>
 #include <string>
@@ -163,6 +165,15 @@
                     newline = [buffer rangeOfString:@"\n"];
                 }
             };
+
+#if defined(SOGEN_IOS_USE_FEX) && TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+            // FEX's TSO memory-ordering modeling emits misaligned STLR/LDAR atomics that fault
+            // on real ARM64 hardware; those faults can't be delivered correctly on this device
+            // (see the JIT26-debugger-swallows-hardware-exceptions notes elsewhere in
+            // fex_x86_64_emulator.cpp). Disabling TSO modeling makes FEX emit plain LDR/STR
+            // instead, which don't fault on misalignment, eliminating this whole fault class.
+            setenv("EMULATOR_FEX_NO_TSO", "1", 1);
+#endif
 
             sogen::utils::log_ios_device_milestone("[milestone] before create_x86_64_emulator");
 #if defined(SOGEN_IOS_USE_FEX)
