@@ -82,12 +82,23 @@ enum JITGate {
     }
 }
 
+enum JITGateResult {
+    case success
+    case tunnelNotInstalled
+    case failed(String)
+}
+
 enum JITGateOrchestrator {
     // End-to-end sequence ported from the spike's ContentView.attemptBuiltInJIT/
     // startBuiltInJIT (Test 5): tunnel up, then the concurrent enableJIT/prepareRegion
-    // pair, then verify. Calls completion(true) only once the JIT26 region has actually
-    // been proven executable; completion(false, reason) otherwise, and the emulator must
-    // not be started in that case.
+    // pair, then verify. Calls completion(.success) only once the JIT26 region has actually
+    // been proven executable; completion(.failed(reason)) otherwise, and the emulator must
+    // not be started in that case. completion(.tunnelNotInstalled) is only reachable when
+    // SOGEN_IOS_USE_LOCALDEVVPN is set and LocalDevVPN isn't installed on the device.
+    //
+    // Which tunnel mechanism gates this is a build-time choice (see project.yml's
+    // SOGEN_IOS_USE_LOCALDEVVPN comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-
+    // design.md) -- there is no runtime auto-detection or fallback between the two.
     //
     // JITCoordinator.enableJIT's XPC reply arrives almost immediately (an ack that the JIT26
     // debug session has started, not that it's done -- see JITHelperExtension.swift's own
@@ -97,15 +108,10 @@ enum JITGateOrchestrator {
     // reply. What changed is visibility: onProgressLine below receives every one of universal.js's
     // own log() lines for as long as the session stays attached (polled over the same XPC
     // connection -- see JITCoordinator.swift), not just this one ack.
-    static func run(pairingData: Data, log: @escaping (String) -> Void, completion: @escaping (Bool, String) -> Void) {
+    static func run(pairingData: Data, log: @escaping (String) -> Void, completion: @escaping (JITGateResult) -> Void) {
         log("[jit] starting tunnel extension ...")
-        TunnelManager.ensureConnected { tunnelUp, tunnelMessage in
-            log("[jit] tunnel \(tunnelUp ? "up" : "FAILED"): \(tunnelMessage)")
-            guard tunnelUp else {
-                completion(false, "tunnel failed to start: \(tunnelMessage)")
-                return
-            }
 
+        func proceedAfterTunnel() {
             log("[jit] calling JITHelper (XPC) -- preparing the JIT26 region concurrently, not after")
 
             JITCoordinator.enableJIT(
@@ -117,14 +123,39 @@ enum JITGateOrchestrator {
 
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let region = JITGate.prepareRegion(log: log) else {
-                    completion(false, "JIT26 self-test region prepare failed")
+                    completion(.failed("JIT26 self-test region prepare failed"))
                     return
                 }
                 JITGate.verifyRegion(region, log: log)
                 log("[jit] JIT26 self-test verified; debug session stays attached for Unicorn")
-                completion(true, "JIT26 self-test verified")
+                completion(.success)
             }
         }
+
+#if SOGEN_IOS_USE_LOCALDEVVPN
+        LocalDevVPNManager.ensureConnected { result in
+            switch result {
+            case .connected:
+                log("[jit] tunnel up (LocalDevVPN)")
+                proceedAfterTunnel()
+            case .notInstalled:
+                log("[jit] LocalDevVPN is not installed")
+                completion(.tunnelNotInstalled)
+            case .failed(let message):
+                log("[jit] tunnel FAILED (LocalDevVPN): \(message)")
+                completion(.failed("tunnel failed to start: \(message)"))
+            }
+        }
+#else
+        TunnelManager.ensureConnected { tunnelUp, tunnelMessage in
+            log("[jit] tunnel \(tunnelUp ? "up" : "FAILED"): \(tunnelMessage)")
+            guard tunnelUp else {
+                completion(.failed("tunnel failed to start: \(tunnelMessage)"))
+                return
+            }
+            proceedAfterTunnel()
+        }
+#endif
     }
 
     // TEMPORARY DIAGNOSTIC BYPASS -- do not use for the shipping app. Added for the pivot to
@@ -137,17 +168,17 @@ enum JITGateOrchestrator {
     // spins up OUR OWN debug session is skipped. See ContentView.attemptBoot for the
     // SOGEN_JIT26_XCODE_DEBUG_BYPASS environment variable that selects this path. Remove once the
     // real bug is found and go back to run() above for the shipping self-contained flow.
-    static func runXcodeDebuggerBypass(log: @escaping (String) -> Void, completion: @escaping (Bool, String) -> Void) {
+    static func runXcodeDebuggerBypass(log: @escaping (String) -> Void, completion: @escaping (JITGateResult) -> Void) {
         log("[jit] SOGEN_JIT26_XCODE_DEBUG_BYPASS set -- skipping the embedded tunnel/JITHelper " +
             "flow, waiting for Xcode's own debugger to attach instead")
         DispatchQueue.global(qos: .userInitiated).async {
             guard let region = JITGate.prepareRegion(log: log) else {
-                completion(false, "JIT26 self-test region prepare failed")
+                completion(.failed("JIT26 self-test region prepare failed"))
                 return
             }
             JITGate.verifyRegion(region, log: log)
             log("[jit] JIT26 self-test verified (Xcode-debugger bypass path)")
-            completion(true, "JIT26 self-test verified")
+            completion(.success)
         }
     }
 }
