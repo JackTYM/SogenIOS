@@ -2,9 +2,11 @@ name: SogenIOS
 options:
   bundleIdPrefix: com.jacksonyarger
   # Xcode 27's iPhoneOS SDK libc++ headers hard-error (unsupported-platform #warning as -Werror)
-  # below iOS 15.0 - this was 14.0 until that toolchain update.
+  # below iOS 15.0 - this was 14.0 until that toolchain update. Bumped to 16.0 for
+  # NavigationStack/.navigationDestination(isPresented:) in SetupView/EmulationView; JITHelper
+  # already requires iOS 26 anyway, so this doesn't narrow real device support.
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   createIntermediateGroups: true
 
 targets:

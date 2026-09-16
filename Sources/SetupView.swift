@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-struct ContentView: View {
+struct SetupView: View {
     @State private var logLines: [String] = []
     @State private var emulator: SogenEmulator?
     @State private var pendingLayer: CALayer?
@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var rootProvisioning = false
     @State private var rootProvisioner: EmulationRootProvisioner?
     @State private var needsLocalDevVPNInstall = false
+    @State private var bootedEmulator: SogenEmulator?
+    @State private var didBoot = false
 
     // Neither SwiftUI's .fileImporter nor a directly-wrapped UIDocumentPickerViewController
     // respond to taps on real iPhone hardware under this app's Feather/ArcticSign resigning --
@@ -99,6 +101,11 @@ struct ContentView: View {
                 .onChange(of: logLines.count) { count in
                     proxy.scrollTo(count - 1, anchor: .bottom)
                 }
+            }
+        }
+        .navigationDestination(isPresented: $didBoot) {
+            if let emulator = bootedEmulator {
+                EmulationView(emulator: emulator)
             }
         }
     }
@@ -296,5 +303,7 @@ struct ContentView: View {
         appendLog("[sogen] emulation root: \(root)")
         appendLog("[sogen] guest executable: \(guestPath)")
         instance.start()
+        bootedEmulator = instance
+        didBoot = true
     }
 }
