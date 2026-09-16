@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var rootReady = false
     @State private var rootProvisioning = false
     @State private var rootProvisioner: EmulationRootProvisioner?
+    @State private var needsLocalDevVPNInstall = false
 
     // Neither SwiftUI's .fileImporter nor a directly-wrapped UIDocumentPickerViewController
     // respond to taps on real iPhone hardware under this app's Feather/ArcticSign resigning --
@@ -66,6 +67,20 @@ struct ContentView: View {
                     checkForPairingFile()
                 }
                 .padding(6)
+                if needsLocalDevVPNInstall {
+                    Button("Install LocalDevVPN") {
+                        if let url = URL(string: "https://apps.apple.com/us/app/localdevvpn/id6755608044") {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                    .padding(6)
+                    Button("Retry") {
+                        needsLocalDevVPNInstall = false
+                        bootAttempted = false
+                        attemptBoot()
+                    }
+                    .padding(6)
+                }
                 Spacer()
             }
 
@@ -208,11 +223,16 @@ struct ContentView: View {
             bootAttempted = true
             JITGateOrchestrator.runXcodeDebuggerBypass(
                 log: { line in DispatchQueue.main.async { appendLog(line) } },
-                completion: { success, message in
+                completion: { result in
                     DispatchQueue.main.async {
-                        if success {
+                        switch result {
+                        case .success:
                             startEmulator(with: layer)
-                        } else {
+                        case .tunnelNotInstalled:
+                            // Unreachable on this path -- runXcodeDebuggerBypass never touches
+                            // TunnelManager/LocalDevVPNManager -- but the switch must be exhaustive.
+                            appendLog("ERROR: unexpected tunnelNotInstalled on the Xcode-debugger bypass path")
+                        case .failed(let message):
                             appendLog("ERROR: JIT grant failed (Xcode-debugger bypass path), " +
                                       "refusing to start the guest: \(message)")
                         }
@@ -238,11 +258,17 @@ struct ContentView: View {
             log: { line in
                 DispatchQueue.main.async { appendLog(line) }
             },
-            completion: { success, message in
+            completion: { result in
                 DispatchQueue.main.async {
-                    if success {
+                    switch result {
+                    case .success:
                         startEmulator(with: layer)
-                    } else {
+                    case .tunnelNotInstalled:
+                        needsLocalDevVPNInstall = true
+                        appendLog("[jit] LocalDevVPN is required for this build's JIT-grant tunnel -- " +
+                                  "tap \"Install LocalDevVPN\" below, install it from the App Store, " +
+                                  "then tap \"Retry\"")
+                    case .failed(let message):
                         appendLog("ERROR: JIT grant failed, refusing to start the guest " +
                                   "(it would crash on the first new Unicorn JIT translation): \(message)")
                     }
