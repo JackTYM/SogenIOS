@@ -40,6 +40,12 @@ targets:
       - sdk: NetworkExtension.framework
       - target: JITHelper
         embed: true
+      # Self-signed/sideload builds: comment out this dependency (both lines below) -- a personal
+      # developer account can never provision TunnelExtension's Network Extension entitlement (see
+      # tools/sogen-ios/README.md's "JIT grant" section). Also set SOGEN_IOS_USE_LOCALDEVVPN=1 in
+      # GCC_PREPROCESSOR_DEFINITIONS below when doing so, so LocalDevVPNManager.swift is used for
+      # the JIT-grant tunnel instead of TunnelManager.swift. See
+      # docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
       - target: TunnelExtension
         embed: true
     settings:
@@ -64,6 +70,10 @@ targets:
         CLANG_ENABLE_OBJC_ARC: YES
         # Developer toggle: construct the FEX backend instead of Unicorn in SogenBridge.mm
         # (see SOGEN_IOS_USE_FEX there). Enabled for the Phase 2 real-device demo build.
+        #
+        # Self-signed/sideload builds: add "SOGEN_IOS_USE_LOCALDEVVPN=1" to the array below (comma-
+        # separated), and comment out the TunnelExtension dependency above -- see that dependency's
+        # own comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
         GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1"]
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
         # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the
@@ -139,6 +149,15 @@ targets:
         LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # LocalDevVPN support (see docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md).
+        # Declared unconditionally in both build variants -- harmless when unused (developer-signed
+        # builds never call LocalDevVPNManager), and needed at all in the self-signed variant.
+        LSApplicationQueriesSchemes:
+          - localdevvpn
+        CFBundleURLTypes:
+          - CFBundleURLName: com.jacksonyarger.sogenios
+            CFBundleURLSchemes:
+              - sogenios
 
   # StikJIT (MPL-2.0, https://github.com/StikDebug/StikJIT), vendored from source under
   # Vendor/StikJIT-src -- ported verbatim from the JIT spike's project.yml. Built from
