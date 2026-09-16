@@ -1,17 +1,28 @@
 import SwiftUI
 import UIKit
 
-/// The emulation screen shell. Chrome (back button styling, icon row, mouse-mode switching,
-/// gestures) and the real live guest layer are added in later tasks of this same plan -- this
-/// task only wires navigation and shows a placeholder.
 struct EmulationView: View {
     let emulator: SogenEmulator
     @Environment(\.dismiss) private var dismiss
 
+    @State private var mode: MouseMode = .touchscreen
+    @State private var frameSize: CGSize = .zero
+
     var body: some View {
         VStack(spacing: 0) {
-            Color.black
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmulatorView(
+                onViewReady: { layer in
+                    emulator.attach(layer)
+                },
+                mode: mode,
+                frameSize: frameSize,
+                onDeliverMove: { point in emulator.deliverMouseMove(point) },
+                onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
+                onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
+                onDeliverClick: { emulator.deliverTap() },
+                onDeliverRightClick: { emulator.deliverRightClick() }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -22,6 +33,11 @@ struct EmulationView: View {
                 }) {
                     Image(systemName: "chevron.left")
                 }
+            }
+        }
+        .onAppear {
+            emulator.onFrameSize = { size in
+                frameSize = size
             }
         }
     }
