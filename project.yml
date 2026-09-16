@@ -46,8 +46,8 @@ targets:
       # GCC_PREPROCESSOR_DEFINITIONS below when doing so, so LocalDevVPNManager.swift is used for
       # the JIT-grant tunnel instead of TunnelManager.swift. See
       # docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
-      - target: TunnelExtension
-        embed: true
+      # - target: TunnelExtension
+      #   embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios
@@ -74,7 +74,7 @@ targets:
         # Self-signed/sideload builds: add "SOGEN_IOS_USE_LOCALDEVVPN=1" to the array below (comma-
         # separated), and comment out the TunnelExtension dependency above -- see that dependency's
         # own comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
-        GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1"]
+        GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1", "SOGEN_IOS_USE_LOCALDEVVPN=1"]
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
         # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the
         # app still dlsym()s vkGetInstanceProcAddr out of its own image, so nothing MoltenVK
