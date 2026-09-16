@@ -4,7 +4,8 @@ import UIKit
 // Provides the same JIT-grant tunnel role as TunnelManager.swift, via LocalDevVPN
 // (https://github.com/jkcoxson/LocalDevVPN) -- a separately-installed App Store app that holds
 // the Network Extension entitlement TunnelExtension needs but can't get under personal-team
-// signing. Selected instead of TunnelManager when SOGEN_IOS_USE_LOCALDEVVPN is set (project.yml).
+// signing. Intended to be selected instead of TunnelManager when SOGEN_IOS_USE_LOCALDEVVPN is
+// set (project.yml); that selection is wired up by a later task in this plan.
 // See docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
 enum LocalDevVPNResult {
     case connected
@@ -30,6 +31,7 @@ final class LocalDevVPNManager {
             return
         }
 
+        shared.resolve(.failed("superseded by a newer request"))
         shared.pendingCompletion = completion
 
         let timeoutItem = DispatchWorkItem {
@@ -41,8 +43,8 @@ final class LocalDevVPNManager {
         UIApplication.shared.open(launchURL)
     }
 
-    // Called from SogenApp's onOpenURL handler (see the app entry point) when a "sogenios://"
-    // callback arrives.
+    // Intended to be called from an onOpenURL handler (not yet added) when a "sogenios://"
+    // callback arrives; that wiring is a separate task in this plan.
     static func handleCallback() {
         shared.resolve(.connected)
     }
