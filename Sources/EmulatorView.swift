@@ -11,7 +11,16 @@ enum MouseMode {
 /// touchscreen-vs-trackpad rationale (Steam Link's Direct-Cursor/Trackpad modes are the direct
 /// inspiration).
 final class EmulatorHostView: UIView {
-    var mode: MouseMode = .touchscreen
+    // UIPanGestureRecognizer's move-to-.began threshold is much shorter than
+    // UILongPressGestureRecognizer's minimumPressDuration, so leaving pan enabled in
+    // touchscreen mode lets it win recognition over a press-and-hold-drag, silently
+    // dropping the drag (handlePan is a no-op there). Disabling it outside trackpad mode
+    // removes it from the recognition race entirely.
+    var mode: MouseMode = .touchscreen {
+        didSet {
+            panRecognizer.isEnabled = mode == .trackpad
+        }
+    }
     var frameSize: CGSize = .zero
     var onDeliverMove: ((CGPoint) -> Void)?
     var onDeliverButton: ((CGPoint, UInt32) -> Void)?
@@ -23,6 +32,8 @@ final class EmulatorHostView: UIView {
     private let wmLButtonUp: UInt32 = 0x0202
     private let wmRButtonDown: UInt32 = 0x0204
     private let wmRButtonUp: UInt32 = 0x0205
+
+    private let panRecognizer = UIPanGestureRecognizer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -36,8 +47,9 @@ final class EmulatorHostView: UIView {
         twoFingerTap.numberOfTouchesRequired = 2
         addGestureRecognizer(twoFingerTap)
 
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
-        addGestureRecognizer(pan)
+        panRecognizer.addTarget(self, action: #selector(handlePan))
+        panRecognizer.isEnabled = mode == .trackpad
+        addGestureRecognizer(panRecognizer)
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
         longPress.minimumPressDuration = 0.35
