@@ -28,6 +28,27 @@ NS_ASSUME_NONNULL_BEGIN
 /// Queues one left-button click. Delivered on the emulator thread at the next event pump.
 - (void)deliverTap;
 
+/// Delivers a positioned mouse move (touchscreen mode). `point` is in guest-frame pixel
+/// coordinates, already transformed from view space by the caller.
+- (void)deliverMouseMove:(CGPoint)point;
+
+/// Delivers a positioned mouse button event (touchscreen mode). `message` is one of the
+/// WM_LBUTTONDOWN/WM_LBUTTONUP/WM_RBUTTONDOWN/WM_RBUTTONUP constants.
+- (void)deliverMouseButton:(CGPoint)point message:(uint32_t)message;
+
+/// Delivers a relative mouse movement delta (trackpad mode) via the existing raw-input path.
+- (void)deliverMouseDelta:(CGFloat)dx dy:(CGFloat)dy;
+
+/// Queues one right-button click via the existing raw-input path (trackpad mode).
+- (void)deliverRightClick;
+
+/// Re-points frame presentation at a new layer -- used when a later-created view produces its
+/// own CALayer after the emulator was already constructed/started against a placeholder.
+- (void)attachLayer:(CALayer *)layer;
+
+/// Invoked on the main queue whenever the guest's presented frame size changes.
+@property (nonatomic, copy, nullable) void (^onFrameSize)(CGSize size);
+
 @end
 
 NS_ASSUME_NONNULL_END

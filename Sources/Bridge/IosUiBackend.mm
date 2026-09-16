@@ -35,9 +35,30 @@ namespace sogen
         this->raw_mouse_sink_ = std::move(sink);
     }
 
+    void ios_ui_backend::set_mouse_move_sink(mouse_move_sink sink)
+    {
+        this->mouse_move_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_mouse_button_sink(mouse_button_sink sink)
+    {
+        this->mouse_button_sink_ = std::move(sink);
+    }
+
     void ios_ui_backend::set_log_sink(log_sink sink)
     {
         this->log_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_frame_size_sink(frame_size_sink sink)
+    {
+        this->frame_size_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_layer(CALayer* layer)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->layer_ = layer;
     }
 
     void ios_ui_backend::emit_log(const char* format, ...) const
@@ -67,26 +88,82 @@ namespace sogen
     void ios_ui_backend::queue_left_click()
     {
         const std::lock_guard<std::mutex> lock(this->mutex_);
-        this->pending_button_flags_.push_back(RI_MOUSE_LEFT_BUTTON_DOWN);
-        this->pending_button_flags_.push_back(RI_MOUSE_LEFT_BUTTON_UP);
+        this->pending_events_.push_back(
+            {.type = queued_input_event::kind::raw_button, .button_flags = RI_MOUSE_LEFT_BUTTON_DOWN});
+        this->pending_events_.push_back(
+            {.type = queued_input_event::kind::raw_button, .button_flags = RI_MOUSE_LEFT_BUTTON_UP});
+    }
+
+    void ios_ui_backend::queue_right_click()
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back(
+            {.type = queued_input_event::kind::raw_button, .button_flags = RI_MOUSE_RIGHT_BUTTON_DOWN});
+        this->pending_events_.push_back(
+            {.type = queued_input_event::kind::raw_button, .button_flags = RI_MOUSE_RIGHT_BUTTON_UP});
+    }
+
+    void ios_ui_backend::queue_mouse_delta(const int32_t dx, const int32_t dy)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back({.type = queued_input_event::kind::raw_delta, .dx = dx, .dy = dy});
+    }
+
+    void ios_ui_backend::queue_mouse_move(const int32_t x, const int32_t y)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back({.type = queued_input_event::kind::absolute_move, .x = x, .y = y});
+    }
+
+    void ios_ui_backend::queue_mouse_button(const int32_t x, const int32_t y, const uint32_t message)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back(
+            {.type = queued_input_event::kind::absolute_button, .x = x, .y = y, .message = message});
     }
 
     void ios_ui_backend::pump_events()
     {
-        std::vector<uint16_t> flags{};
+        std::vector<queued_input_event> events{};
         {
             const std::lock_guard<std::mutex> lock(this->mutex_);
-            flags.swap(this->pending_button_flags_);
+            events.swap(this->pending_events_);
         }
 
-        for (const auto button_flags : flags)
+        for (const auto& event : events)
         {
-            this->emit_log("[ios-ui] delivering raw mouse input flags=0x%04X", button_flags);
-            if (this->raw_mouse_sink_)
+            switch (event.type)
             {
-                // dx/dy are 0: this is a button transition, not motion. button_data is the wheel
-                // delta in RAWMOUSE and is 0 for every non-wheel transition.
-                this->raw_mouse_sink_(0, 0, button_flags, 0);
+            case queued_input_event::kind::raw_button:
+                this->emit_log("[ios-ui] delivering raw mouse input flags=0x%04X", event.button_flags);
+                if (this->raw_mouse_sink_)
+                {
+                    // dx/dy are 0: this is a button transition, not motion. button_data is the
+                    // wheel delta in RAWMOUSE and is 0 for every non-wheel transition.
+                    this->raw_mouse_sink_(0, 0, event.button_flags, 0);
+                }
+                break;
+            case queued_input_event::kind::raw_delta:
+                if (this->raw_mouse_sink_)
+                {
+                    this->raw_mouse_sink_(event.dx, event.dy, 0, 0);
+                }
+                break;
+            case queued_input_event::kind::absolute_move:
+                this->emit_log("[ios-ui] delivering positioned mouse move x=%d y=%d", event.x, event.y);
+                if (this->mouse_move_sink_)
+                {
+                    this->mouse_move_sink_(event.x, event.y);
+                }
+                break;
+            case queued_input_event::kind::absolute_button:
+                this->emit_log("[ios-ui] delivering positioned mouse button message=0x%04X x=%d y=%d", event.message,
+                               event.x, event.y);
+                if (this->mouse_button_sink_)
+                {
+                    this->mouse_button_sink_(event.x, event.y, event.message);
+                }
+                break;
             }
         }
     }
@@ -131,9 +208,18 @@ namespace sogen
         std::memcpy(copy, surface.pixels, byte_count);
 
         uint64_t frame_index = 0;
+        bool size_changed = false;
         {
             const std::lock_guard<std::mutex> lock(this->mutex_);
             frame_index = this->presented_frames_++;
+            size_changed = surface.width != this->last_frame_width_ || surface.height != this->last_frame_height_;
+            this->last_frame_width_ = surface.width;
+            this->last_frame_height_ = surface.height;
+        }
+
+        if (size_changed && this->frame_size_sink_)
+        {
+            this->frame_size_sink_(surface.width, surface.height);
         }
 
         this->emit_log("[ios-ui] frame %llu hwnd=0x%llX %dx%d stride=%d fmt=%d first_pixel=%02X%02X%02X%02X",
@@ -157,7 +243,13 @@ namespace sogen
             return;
         }
 
-        CALayer* layer = this->layer_;
+        CALayer* layer;
+        {
+            // set_layer() can re-point layer_ from the UI thread while this runs on the emulator
+            // thread -- must read it under mutex_.
+            const std::lock_guard<std::mutex> lock(this->mutex_);
+            layer = this->layer_;
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
           [CATransaction begin];
           [CATransaction setDisableActions:YES];

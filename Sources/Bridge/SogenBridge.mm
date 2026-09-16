@@ -205,6 +205,22 @@
                 [emulator_ptr](const int32_t dx, const int32_t dy, const uint16_t flags, const uint16_t data) {
                     emulator_ptr->deliver_raw_mouse_input(dx, dy, flags, data);
                 });
+            ui_raw->set_mouse_move_sink([emulator_ptr](const int32_t x, const int32_t y) {
+                emulator_ptr->deliver_mouse_move(x, y);
+            });
+            ui_raw->set_mouse_button_sink([emulator_ptr](const int32_t x, const int32_t y, const uint32_t message) {
+                emulator_ptr->deliver_mouse_button(x, y, message);
+            });
+            ui_raw->set_frame_size_sink([weakSelf](const int32_t width, const int32_t height) {
+                SogenEmulator* strongSelf = weakSelf;
+                if (!strongSelf || !strongSelf.onFrameSize)
+                {
+                    return;
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  strongSelf.onFrameSize(CGSizeMake(width, height));
+                });
+            });
 
             strongSelf->_emulator = std::move(win_emu);
             strongSelf->_ui = ui_raw;
@@ -253,6 +269,46 @@
     if (_ui)
     {
         _ui->queue_left_click();
+    }
+}
+
+- (void)deliverMouseMove:(CGPoint)point
+{
+    if (_ui)
+    {
+        _ui->queue_mouse_move(static_cast<int32_t>(point.x), static_cast<int32_t>(point.y));
+    }
+}
+
+- (void)deliverMouseButton:(CGPoint)point message:(uint32_t)message
+{
+    if (_ui)
+    {
+        _ui->queue_mouse_button(static_cast<int32_t>(point.x), static_cast<int32_t>(point.y), message);
+    }
+}
+
+- (void)deliverMouseDelta:(CGFloat)dx dy:(CGFloat)dy
+{
+    if (_ui)
+    {
+        _ui->queue_mouse_delta(static_cast<int32_t>(dx), static_cast<int32_t>(dy));
+    }
+}
+
+- (void)deliverRightClick
+{
+    if (_ui)
+    {
+        _ui->queue_right_click();
+    }
+}
+
+- (void)attachLayer:(CALayer *)layer
+{
+    if (_ui)
+    {
+        _ui->set_layer(layer);
     }
 }
 
