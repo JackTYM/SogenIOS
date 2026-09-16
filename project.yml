@@ -42,9 +42,9 @@ targets:
         embed: true
       # Self-signed/sideload builds: comment out this dependency (both lines below) -- a personal
       # developer account can never provision TunnelExtension's Network Extension entitlement (see
-      # tools/sogen-ios/README.md's "JIT grant" section). Also set SOGEN_IOS_USE_LOCALDEVVPN=1 in
-      # GCC_PREPROCESSOR_DEFINITIONS below when doing so, so LocalDevVPNManager.swift is used for
-      # the JIT-grant tunnel instead of TunnelManager.swift. See
+      # tools/sogen-ios/README.md's "JIT grant" section). Also add SOGEN_IOS_USE_LOCALDEVVPN to
+      # SWIFT_ACTIVE_COMPILATION_CONDITIONS below when doing so, so LocalDevVPNManager.swift is
+      # used for the JIT-grant tunnel instead of TunnelManager.swift. See
       # docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
       # - target: TunnelExtension
       #   embed: true
@@ -71,10 +71,11 @@ targets:
         # Developer toggle: construct the FEX backend instead of Unicorn in SogenBridge.mm
         # (see SOGEN_IOS_USE_FEX there). Enabled for the Phase 2 real-device demo build.
         #
-        # Self-signed/sideload builds: add "SOGEN_IOS_USE_LOCALDEVVPN=1" to the array below (comma-
-        # separated), and comment out the TunnelExtension dependency above -- see that dependency's
-        # own comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
-        GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1", "SOGEN_IOS_USE_LOCALDEVVPN=1"]
+        # Self-signed/sideload builds: add "SOGEN_IOS_USE_LOCALDEVVPN" to SWIFT_ACTIVE_COMPILATION_
+        # CONDITIONS below, and comment out the TunnelExtension dependency above -- see that
+        # dependency's own comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
+        GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1"]
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: ["SOGEN_IOS_USE_LOCALDEVVPN"]
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
         # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the
         # app still dlsym()s vkGetInstanceProcAddr out of its own image, so nothing MoltenVK
