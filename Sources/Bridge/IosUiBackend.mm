@@ -74,6 +74,9 @@ namespace sogen
             }
         }
 
+        this->emit_log("[ios-ui] set_layer layer=%p cached_image=%s", (__bridge void*)layer,
+                       cached_image != nullptr ? "yes" : "no");
+
         if (cached_image == nullptr)
         {
             return;
