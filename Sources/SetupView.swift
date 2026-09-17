@@ -12,6 +12,7 @@ struct SetupView: View {
     @State private var needsLocalDevVPNInstall = false
     @State private var bootedEmulator: SogenEmulator?
     @State private var didBoot = false
+    @State private var everBooted = false
 
     // Neither SwiftUI's .fileImporter nor a directly-wrapped UIDocumentPickerViewController
     // respond to taps on real iPhone hardware under this app's Feather/ArcticSign resigning --
@@ -75,6 +76,17 @@ struct SetupView: View {
                     checkForPairingFile()
                 }
                 .padding(6)
+                if everBooted {
+                    Button("Boot Input Test") {
+                        guard let layer = pendingLayer else { return }
+                        emulator?.stop()
+                        emulator = nil
+                        bootedEmulator = nil
+                        didBoot = false
+                        startEmulator(with: layer, guestResourceName: "mouse-input-test-sample")
+                    }
+                    .padding(6)
+                }
                 if needsLocalDevVPNInstall {
                     Button("Install LocalDevVPN") {
                         if let url = URL(string: "https://apps.apple.com/us/app/localdevvpn/id6755608044") {
@@ -290,14 +302,14 @@ struct SetupView: View {
 #endif
     }
 
-    private func startEmulator(with layer: CALayer) {
+    private func startEmulator(with layer: CALayer, guestResourceName: String = "native-gpu-clear-sample") {
         guard emulator == nil else { return }
 
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let root = documents.appendingPathComponent("root").path
 
-        guard let guestPath = Bundle.main.path(forResource: "native-gpu-clear-sample", ofType: "exe") else {
-            appendLog("ERROR: native-gpu-clear-sample.exe is not in the app bundle")
+        guard let guestPath = Bundle.main.path(forResource: guestResourceName, ofType: "exe") else {
+            appendLog("ERROR: \(guestResourceName).exe is not in the app bundle")
             return
         }
 
@@ -311,5 +323,6 @@ struct SetupView: View {
         instance.start()
         bootedEmulator = instance
         didBoot = true
+        everBooted = true
     }
 }
