@@ -22,7 +22,9 @@ tools/stage-ios-emulation-root.sh
 
 ```sh
 cd tools/sogen-ios
-mkdir -p Resources && cp ../../build/ios-root/native-gpu-clear-sample.exe Resources/
+mkdir -p Resources
+cp ../../build/ios-root/native-gpu-clear-sample.exe Resources/
+cp ../../build/ios-root/mouse-input-test-sample.exe Resources/
 xcodegen generate
 xcodebuild -project SogenIOS.xcodeproj -scheme SogenIOS -sdk iphonesimulator \
   -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build build
