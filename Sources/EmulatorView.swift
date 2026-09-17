@@ -143,11 +143,9 @@ struct EmulatorView: UIViewRepresentable {
     let onDeliverRightClick: () -> Void
 
     func makeUIView(context: Context) -> EmulatorHostView {
-        sogenMirrorLogLineToFile("[swift-diag] EmulatorView.makeUIView called")
         let view = EmulatorHostView(frame: .zero)
         configure(view)
         onViewReady(view.layer)
-        sogenMirrorLogLineToFile("[swift-diag] EmulatorView.makeUIView onViewReady returned")
         return view
     }
 

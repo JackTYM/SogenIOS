@@ -222,8 +222,15 @@
                 });
             });
 
-            strongSelf->_emulator = std::move(win_emu);
-            strongSelf->_ui = ui_raw;
+            CALayer* currentLayer = nullptr;
+            @synchronized(strongSelf)
+            {
+                strongSelf->_emulator = std::move(win_emu);
+                strongSelf->_ui = ui_raw;
+                currentLayer = strongSelf->_layer;
+            }
+            // Picks up whatever attachLayer: call (if any) landed while _ui was still null above.
+            ui_raw->set_layer(currentLayer);
 
             [weakSelf appendLog:@"[sogen] starting guest"];
             sogen::utils::log_ios_device_milestone("[milestone] before windows_emulator::start()");
@@ -306,9 +313,20 @@
 
 - (void)attachLayer:(CALayer *)layer
 {
-    if (_ui)
+    // EmulationView navigates and calls this almost immediately after start() returns, well
+    // before the background thread below reaches windows_emulator's own (much slower)
+    // construction and assigns _ui -- so _ui is routinely still null here. Remember the layer
+    // in _layer regardless, and apply it once _ui exists (see the assignment further down),
+    // instead of silently dropping this call forever.
+    sogen::ios_ui_backend* ui = nullptr;
+    @synchronized(self)
     {
-        _ui->set_layer(layer);
+        _layer = layer;
+        ui = _ui;
+    }
+    if (ui)
+    {
+        ui->set_layer(layer);
     }
 }
 
