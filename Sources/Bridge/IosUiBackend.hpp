@@ -28,6 +28,7 @@ namespace sogen
         using mouse_button_sink = std::function<void(int32_t x, int32_t y, uint32_t message)>;
         using log_sink = std::function<void(const char* line)>;
         using frame_size_sink = std::function<void(int32_t width, int32_t height)>;
+        using cursor_visibility_sink = std::function<void(bool visible)>;
 
         explicit ios_ui_backend(CALayer* layer);
         ~ios_ui_backend() override;
@@ -35,12 +36,14 @@ namespace sogen
         void set_event_sink(event_sink sink) override;
         void pump_events() override;
         void present_surface(hwnd window, const ui_surface_desc& surface) override;
+        void set_cursor_visibility(bool visible) override;
 
         void set_raw_mouse_sink(raw_mouse_sink sink);
         void set_mouse_move_sink(mouse_move_sink sink);
         void set_mouse_button_sink(mouse_button_sink sink);
         void set_log_sink(log_sink sink);
         void set_frame_size_sink(frame_size_sink sink);
+        void set_cursor_visibility_sink(cursor_visibility_sink sink);
         void set_layer(CALayer* layer);
 
         // Existing raw-input queuing (trackpad mode / games).
@@ -89,6 +92,7 @@ namespace sogen
         mouse_button_sink mouse_button_sink_{};
         log_sink log_sink_{};
         frame_size_sink frame_size_sink_{};
+        cursor_visibility_sink cursor_visibility_sink_{};
 
         mutable std::mutex mutex_{};
         std::vector<queued_input_event> pending_events_{};

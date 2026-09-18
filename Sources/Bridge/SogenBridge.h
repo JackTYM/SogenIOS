@@ -49,6 +49,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Invoked on the main queue whenever the guest's presented frame size changes.
 @property (nonatomic, copy, nullable) void (^onFrameSize)(CGSize size);
 
+/// Invoked on the main queue whenever the guest calls ShowCursor/SetCursor to show or hide the
+/// cursor (e.g. a fullscreen game hiding it to render its own).
+@property (nonatomic, copy, nullable) void (^onCursorVisibilityChange)(BOOL visible);
+
 @end
 
 NS_ASSUME_NONNULL_END

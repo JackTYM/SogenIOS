@@ -61,6 +61,20 @@ namespace sogen
         this->frame_size_sink_ = std::move(sink);
     }
 
+    void ios_ui_backend::set_cursor_visibility_sink(cursor_visibility_sink sink)
+    {
+        this->cursor_visibility_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_cursor_visibility(const bool visible)
+    {
+        this->emit_log("[ios-ui] cursor visibility=%s", visible ? "visible" : "hidden");
+        if (this->cursor_visibility_sink_)
+        {
+            this->cursor_visibility_sink_(visible);
+        }
+    }
+
     void ios_ui_backend::set_layer(CALayer* layer)
     {
         CGImageRef cached_image = nullptr;

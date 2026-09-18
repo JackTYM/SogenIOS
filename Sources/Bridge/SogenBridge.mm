@@ -221,6 +221,16 @@
                   strongSelf.onFrameSize(CGSizeMake(width, height));
                 });
             });
+            ui_raw->set_cursor_visibility_sink([weakSelf](const bool visible) {
+                SogenEmulator* strongSelf = weakSelf;
+                if (!strongSelf || !strongSelf.onCursorVisibilityChange)
+                {
+                    return;
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  strongSelf.onCursorVisibilityChange(visible ? YES : NO);
+                });
+            });
 
             CALayer* currentLayer = nullptr;
             @synchronized(strongSelf)
