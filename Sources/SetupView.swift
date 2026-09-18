@@ -61,7 +61,8 @@ struct SetupView: View {
                 onDeliverButton: { _, _ in },
                 onDeliverDelta: { _, _ in },
                 onDeliverClick: { emulator?.deliverTap() },
-                onDeliverRightClick: {}
+                onDeliverRightClick: {},
+                onCursorPositionChange: { _ in }
             )
             .frame(maxWidth: .infinity)
             .aspectRatio(320.0 / 180.0, contentMode: .fit)

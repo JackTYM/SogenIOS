@@ -19,6 +19,12 @@ final class EmulatorHostView: UIView {
     var mode: MouseMode = .touchscreen {
         didSet {
             panRecognizer.isEnabled = mode == .trackpad
+            // The synthetic trackpad cursor has no meaningful position to remember from
+            // touchscreen mode (which never moves it), so start it fresh each time trackpad
+            // mode is entered, rather than carrying over a stale/default value.
+            if mode == .trackpad && oldValue != .trackpad {
+                resetCursorPosition()
+            }
         }
     }
     var frameSize: CGSize = .zero
@@ -27,6 +33,9 @@ final class EmulatorHostView: UIView {
     var onDeliverDelta: ((CGFloat, CGFloat) -> Void)?
     var onDeliverClick: (() -> Void)?
     var onDeliverRightClick: (() -> Void)?
+    var onCursorPositionChange: ((CGPoint) -> Void)?
+
+    private var cursorPosition: CGPoint = .zero
 
     private let wmLButtonDown: UInt32 = 0x0201
     private let wmLButtonUp: UInt32 = 0x0202
@@ -76,6 +85,30 @@ final class EmulatorHostView: UIView {
         return CGPoint(x: guestX, y: guestY)
     }
 
+    /// Clamps a point (in this view's own coordinate space) to the guest content's displayed
+    /// rect, using the same aspect-fit letterbox scale/offset toGuestPoint uses, so the
+    /// synthetic trackpad cursor never visually leaves the guest's rendered area.
+    private func clampToGuestRect(_ point: CGPoint) -> CGPoint {
+        guard frameSize.width > 0, frameSize.height > 0, bounds.width > 0, bounds.height > 0 else {
+            return point
+        }
+        let scale = min(bounds.width / frameSize.width, bounds.height / frameSize.height)
+        let displayedWidth = frameSize.width * scale
+        let displayedHeight = frameSize.height * scale
+        let offsetX = (bounds.width - displayedWidth) / 2
+        let offsetY = (bounds.height - displayedHeight) / 2
+        let clampedX = min(max(point.x, offsetX), offsetX + displayedWidth)
+        let clampedY = min(max(point.y, offsetY), offsetY + displayedHeight)
+        return CGPoint(x: clampedX, y: clampedY)
+    }
+
+    private func resetCursorPosition() {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        cursorPosition = center
+        onCursorPositionChange?(center)
+    }
+
     @objc private func handleTap(_ recognizer: UITapGestureRecognizer) {
         switch mode {
         case .touchscreen:
@@ -103,6 +136,9 @@ final class EmulatorHostView: UIView {
         guard mode == .trackpad else { return }
         let translation = recognizer.translation(in: self)
         onDeliverDelta?(translation.x, translation.y)
+        cursorPosition = clampToGuestRect(
+            CGPoint(x: cursorPosition.x + translation.x, y: cursorPosition.y + translation.y))
+        onCursorPositionChange?(cursorPosition)
         recognizer.setTranslation(.zero, in: self)
     }
 
@@ -141,6 +177,7 @@ struct EmulatorView: UIViewRepresentable {
     let onDeliverDelta: (CGFloat, CGFloat) -> Void
     let onDeliverClick: () -> Void
     let onDeliverRightClick: () -> Void
+    let onCursorPositionChange: (CGPoint) -> Void
 
     func makeUIView(context: Context) -> EmulatorHostView {
         let view = EmulatorHostView(frame: .zero)
@@ -161,5 +198,6 @@ struct EmulatorView: UIViewRepresentable {
         view.onDeliverDelta = onDeliverDelta
         view.onDeliverClick = onDeliverClick
         view.onDeliverRightClick = onDeliverRightClick
+        view.onCursorPositionChange = onCursorPositionChange
     }
 }

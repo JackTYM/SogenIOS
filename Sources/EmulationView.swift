@@ -10,6 +10,8 @@ struct EmulationView: View {
     @State private var frameSize: CGSize = .zero
     @State private var showLogs = false
     @State private var showKeyboard = false
+    @State private var cursorVisible = true
+    @State private var cursorPosition: CGPoint = .zero
 
     private var guestAspectRatio: CGFloat {
         guard frameSize.width > 0, frameSize.height > 0 else { return 320.0 / 180.0 }
@@ -34,6 +36,15 @@ struct EmulationView: View {
                     }
                 }
 
+                if mode == .trackpad && cursorVisible {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 14, height: 14)
+                        .shadow(radius: 2)
+                        .position(cursorPosition)
+                        .allowsHitTesting(false)
+                }
+
                 topBar
                     .padding(8)
                     .background(isLandscape ? Color.black.opacity(0.4) : Color.clear)
@@ -50,6 +61,9 @@ struct EmulationView: View {
             emulator.onFrameSize = { size in
                 frameSize = size
             }
+            emulator.onCursorVisibilityChange = { visible in
+                cursorVisible = visible
+            }
         }
     }
 
@@ -64,7 +78,8 @@ struct EmulationView: View {
             onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
             onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
             onDeliverClick: { emulator.deliverTap() },
-            onDeliverRightClick: { emulator.deliverRightClick() }
+            onDeliverRightClick: { emulator.deliverRightClick() },
+            onCursorPositionChange: { point in cursorPosition = point }
         )
     }
 
