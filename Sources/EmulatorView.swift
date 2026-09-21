@@ -106,7 +106,13 @@ final class EmulatorHostView: UIView {
         guard bounds.width > 0, bounds.height > 0 else { return }
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         cursorPosition = center
-        onCursorPositionChange?(center)
+        // mode's didSet (which calls this) fires from inside configure(_:), itself called from
+        // SwiftUI's updateUIView during a view-update pass -- mutating @State synchronously from
+        // there is undefined behavior and the write can be silently lost (see SetupView.swift's
+        // own onViewReady for the same issue). Defer to the next run-loop turn instead.
+        DispatchQueue.main.async { [onCursorPositionChange] in
+            onCursorPositionChange?(center)
+        }
     }
 
     @objc private func handleTap(_ recognizer: UITapGestureRecognizer) {
