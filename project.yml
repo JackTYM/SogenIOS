@@ -51,7 +51,7 @@ targets:
       # - target: TunnelExtension
       #   embed: true
     settings:
-      base:
+      base: &sogenIOSAppSettings
         PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios
         # The only Apple Development identity present in this Mac's keychain (security
         # find-identity -v -p codesigning). CODE_SIGN_STYLE: Automatic still needs an Apple ID
@@ -146,7 +146,7 @@ targets:
           -force_load $(SRCROOT)/Vendor/MoltenVK/ios-simulator/libMoltenVK.a
     info:
       path: Generated-Info.plist
-      properties:
+      properties: &sogenIOSInfoProperties
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
@@ -161,6 +161,56 @@ targets:
           - CFBundleURLName: com.jacksonyarger.sogenios
             CFBundleURLSchemes:
               - sogenios
+
+  # Simulator-only variant of SogenIOS: identical sources/settings (via the &sogenIOSAppSettings
+  # anchor above, so the two targets can't drift apart), minus the JITHelper/StikJIT dependency
+  # chain. JITHelper depends on StikJIT's vendored libidevice_ffi.a, a real-device-only prebuilt
+  # archive that fails to link for ANY Simulator architecture (see StikJIT's own SUPPORTED_PLATFORMS
+  # comment below) -- SUPPORTED_PLATFORMS alone only stops JITHelper itself from being built for
+  # Simulator, it does NOT stop the app target's embed phase from still trying to copy whatever
+  # stale device-built JITHelper.appex it finds, which fails ValidateEmbeddedBinary ("built for iOS
+  # Simulator but contains embedded content built for iOS"). Omitting the dependency here instead
+  # sidesteps the problem entirely. SetupView.swift's own `#if targetEnvironment(simulator)` branch
+  # already bypasses the whole JIT-grant flow at runtime, so this target needs nothing from
+  # JITHelper/StikJIT to boot a guest with either backend -- matching how this app worked during
+  # Phase 1, before JITHelper/StikJIT existed at all.
+  SogenIOS-Simulator:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+        buildPhase: resources
+    dependencies:
+      - sdk: UIKit.framework
+      - sdk: Foundation.framework
+      - sdk: QuartzCore.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreMotion.framework
+      - sdk: CoreHaptics.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: AVFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: GameController.framework
+      - sdk: Metal.framework
+      - sdk: IOSurface.framework
+      - sdk: OpenGLES.framework
+      - sdk: Security.framework
+      - sdk: UserNotifications.framework
+    settings:
+      base:
+        <<: *sogenIOSAppSettings
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonyarger.sogenios.simulator
+        PRODUCT_NAME: SogenIOS-Simulator
+        # Real device would boot with no JIT-grant capability at all (JITHelper isn't linked into
+        # this target) -- restrict to Simulator so this can't be mistaken for a real-device build.
+        SUPPORTED_PLATFORMS: "iphonesimulator"
+    info:
+      path: Generated-Info.plist
+      properties:
+        <<: *sogenIOSInfoProperties
 
   # StikJIT (MPL-2.0, https://github.com/StikDebug/StikJIT), vendored from source under
   # Vendor/StikJIT-src -- ported verbatim from the JIT spike's project.yml. Built from
