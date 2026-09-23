@@ -50,6 +50,11 @@ struct EmulationView: View {
                     .padding(8)
                     .background(isLandscape ? Color.black.opacity(0.4) : Color.clear)
 
+                SoftwareKeyboardView(isActive: showKeyboard, onChar: { ch in
+                    emulator.deliverChar(ch)
+                })
+                .frame(width: 0, height: 0)
+
                 if showLogs {
                     LogsOverlayView(logLines: logLines, onClose: { showLogs = false })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
