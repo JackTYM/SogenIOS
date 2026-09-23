@@ -12,6 +12,7 @@ struct EmulationView: View {
     @State private var showKeyboard = false
     @State private var cursorVisible = true
     @State private var cursorPosition: CGPoint = .zero
+    @State private var keyboardObserver = HardwareKeyboardObserver()
 
     private var guestAspectRatio: CGFloat {
         guard frameSize.width > 0, frameSize.height > 0 else { return 320.0 / 180.0 }
@@ -63,6 +64,13 @@ struct EmulationView: View {
             }
             emulator.onCursorVisibilityChange = { visible in
                 cursorVisible = visible
+            }
+            keyboardObserver.onKeyDown = { vk, scanCode, extended, wasDown, altContext in
+                emulator.deliverKeyDown(vk, scanCode: scanCode, extended: extended, wasDown: wasDown,
+                                         altContext: altContext)
+            }
+            keyboardObserver.onKeyUp = { vk, scanCode, extended, altContext in
+                emulator.deliverKeyUp(vk, scanCode: scanCode, extended: extended, altContext: altContext)
             }
         }
     }
