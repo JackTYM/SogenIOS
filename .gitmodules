@@ -1,0 +1,3 @@
+[submodule "deps/sogen"]
+	path = deps/sogen
+	url = https://github.com/JackTYM/sogen.git

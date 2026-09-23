@@ -100,7 +100,7 @@ targets:
         # this emulator) would never run. Disable the split so the built app is self-contained.
         ENABLE_DEBUG_DYLIB: NO
         # Repo root, two levels up from tools/sogen-ios.
-        SOGEN_ROOT: "$(SRCROOT)/../.."
+        SOGEN_ROOT: "$(SRCROOT)/deps/sogen"
         HEADER_SEARCH_PATHS:
           - "$(SRCROOT)/Sources"
           - "$(SRCROOT)/Sources/Bridge"
