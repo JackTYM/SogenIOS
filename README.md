@@ -59,8 +59,14 @@ cp "$XCF"/*simulator*/libMoltenVK.a Vendor/MoltenVK/ios-simulator/libMoltenVK.a
 
 The real-device `SogenIOS` target additionally needs `Vendor/StikJIT-src` (StikJIT,
 `StikDebug/StikJIT`, MPL-2.0, vendored from source) including its prebuilt, real-device-only
-`libidevice_ffi.a`. That vendoring is outside the scope of this document -- skip it entirely if
-you only need the Simulator build below.
+`libidevice_ffi.a`. That vendoring is outside the scope of this document -- but `xcodegen
+generate` still validates every target's source paths regardless of which scheme you actually
+build, so a Simulator-only build needs empty placeholders even without vendoring StikJIT for
+real:
+
+```sh
+mkdir -p Vendor/StikJIT-src/Sources Vendor/StikJIT-src/Resources
+```
 
 ## Choosing a backend and a target
 
