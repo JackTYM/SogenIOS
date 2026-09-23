@@ -99,7 +99,7 @@ targets:
         # A bare `xcrun simctl launch` never triggers that load, so the real app code (and
         # this emulator) would never run. Disable the split so the built app is self-contained.
         ENABLE_DEBUG_DYLIB: NO
-        # Repo root, two levels up from tools/sogen-ios.
+        # sogen, vendored as a submodule.
         SOGEN_ROOT: "$(SRCROOT)/deps/sogen"
         HEADER_SEARCH_PATHS:
           - "$(SRCROOT)/Sources"
