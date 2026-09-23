@@ -1,3 +1,4 @@
 [submodule "deps/sogen"]
 	path = deps/sogen
 	url = https://github.com/JackTYM/sogen.git
+	branch = sogen-ios-support
