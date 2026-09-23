@@ -36,6 +36,23 @@ NS_ASSUME_NONNULL_BEGIN
 /// WM_LBUTTONDOWN/WM_LBUTTONUP/WM_RBUTTONDOWN/WM_RBUTTONUP constants.
 - (void)deliverMouseButton:(CGPoint)point message:(uint32_t)message;
 
+/// Delivers a keyboard key-down (hardware-keyboard path). `vk`/`scanCode`/`extended` follow real
+/// Windows WM_KEYDOWN conventions; `wasDown` is true for a held-key repeat, `altContext` is true
+/// when Alt is currently held for a key other than Alt itself (selects WM_SYSKEYDOWN).
+- (void)deliverKeyDown:(uint16_t)vk
+               scanCode:(uint8_t)scanCode
+               extended:(BOOL)extended
+                wasDown:(BOOL)wasDown
+             altContext:(BOOL)altContext;
+
+/// Delivers a keyboard key-up (hardware-keyboard path). See deliverKeyDown:... for parameter
+/// semantics.
+- (void)deliverKeyUp:(uint16_t)vk scanCode:(uint8_t)scanCode extended:(BOOL)extended altContext:(BOOL)altContext;
+
+/// Delivers a WM_CHAR directly (software-keyboard path only -- the hardware-keyboard path relies
+/// on the guest's own TranslateMessage instead).
+- (void)deliverChar:(uint16_t)utf16Char;
+
 /// Delivers a relative mouse movement delta (trackpad mode) via the existing raw-input path.
 - (void)deliverMouseDelta:(CGFloat)dx dy:(CGFloat)dy;
 

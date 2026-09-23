@@ -211,6 +211,18 @@
             ui_raw->set_mouse_button_sink([emulator_ptr](const int32_t x, const int32_t y, const uint32_t message) {
                 emulator_ptr->deliver_mouse_button(x, y, message);
             });
+            ui_raw->set_key_down_sink([emulator_ptr](const uint16_t vk, const uint8_t scan_code,
+                                                       const bool extended, const bool was_down,
+                                                       const bool alt_context) {
+                emulator_ptr->deliver_key_down(vk, scan_code, extended, was_down, alt_context);
+            });
+            ui_raw->set_key_up_sink([emulator_ptr](const uint16_t vk, const uint8_t scan_code, const bool extended,
+                                                     const bool alt_context) {
+                emulator_ptr->deliver_key_up(vk, scan_code, extended, alt_context);
+            });
+            ui_raw->set_char_sink([emulator_ptr](const uint16_t utf16_char) {
+                emulator_ptr->deliver_char(utf16_char);
+            });
             ui_raw->set_frame_size_sink([weakSelf](const int32_t width, const int32_t height) {
                 SogenEmulator* strongSelf = weakSelf;
                 if (!strongSelf || !strongSelf.onFrameSize)
@@ -302,6 +314,34 @@
     if (_ui)
     {
         _ui->queue_mouse_button(static_cast<int32_t>(point.x), static_cast<int32_t>(point.y), message);
+    }
+}
+
+- (void)deliverKeyDown:(uint16_t)vk
+               scanCode:(uint8_t)scanCode
+               extended:(BOOL)extended
+                wasDown:(BOOL)wasDown
+             altContext:(BOOL)altContext
+{
+    if (_ui)
+    {
+        _ui->queue_key_down(vk, scanCode, extended, wasDown, altContext);
+    }
+}
+
+- (void)deliverKeyUp:(uint16_t)vk scanCode:(uint8_t)scanCode extended:(BOOL)extended altContext:(BOOL)altContext
+{
+    if (_ui)
+    {
+        _ui->queue_key_up(vk, scanCode, extended, altContext);
+    }
+}
+
+- (void)deliverChar:(uint16_t)utf16Char
+{
+    if (_ui)
+    {
+        _ui->queue_char(utf16Char);
     }
 }
 
