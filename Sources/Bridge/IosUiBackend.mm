@@ -51,6 +51,21 @@ namespace sogen
         this->mouse_button_sink_ = std::move(sink);
     }
 
+    void ios_ui_backend::set_key_down_sink(key_down_sink sink)
+    {
+        this->key_down_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_key_up_sink(key_up_sink sink)
+    {
+        this->key_up_sink_ = std::move(sink);
+    }
+
+    void ios_ui_backend::set_char_sink(char_sink sink)
+    {
+        this->char_sink_ = std::move(sink);
+    }
+
     void ios_ui_backend::set_log_sink(log_sink sink)
     {
         this->log_sink_ = std::move(sink);
@@ -167,6 +182,35 @@ namespace sogen
             {.type = queued_input_event::kind::absolute_button, .x = x, .y = y, .message = message});
     }
 
+    void ios_ui_backend::queue_key_down(const uint16_t vk, const uint8_t scan_code, const bool extended,
+                                         const bool was_down, const bool alt_context)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back({.type = queued_input_event::kind::key_down,
+                                          .vk = vk,
+                                          .scan_code = scan_code,
+                                          .extended = extended,
+                                          .was_down = was_down,
+                                          .alt_context = alt_context});
+    }
+
+    void ios_ui_backend::queue_key_up(const uint16_t vk, const uint8_t scan_code, const bool extended,
+                                       const bool alt_context)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back({.type = queued_input_event::kind::key_up,
+                                          .vk = vk,
+                                          .scan_code = scan_code,
+                                          .extended = extended,
+                                          .alt_context = alt_context});
+    }
+
+    void ios_ui_backend::queue_char(const uint16_t utf16_char)
+    {
+        const std::lock_guard<std::mutex> lock(this->mutex_);
+        this->pending_events_.push_back({.type = queued_input_event::kind::char_input, .utf16_char = utf16_char});
+    }
+
     void ios_ui_backend::pump_events()
     {
         std::vector<queued_input_event> events{};
@@ -207,6 +251,30 @@ namespace sogen
                 if (this->mouse_button_sink_)
                 {
                     this->mouse_button_sink_(event.x, event.y, event.message);
+                }
+                break;
+            case queued_input_event::kind::key_down:
+                this->emit_log("[ios-ui] delivering key down vk=0x%02X scan=0x%02X extended=%d was_down=%d",
+                               event.vk, event.scan_code, event.extended, event.was_down);
+                if (this->key_down_sink_)
+                {
+                    this->key_down_sink_(event.vk, event.scan_code, event.extended, event.was_down,
+                                         event.alt_context);
+                }
+                break;
+            case queued_input_event::kind::key_up:
+                this->emit_log("[ios-ui] delivering key up vk=0x%02X scan=0x%02X extended=%d", event.vk,
+                               event.scan_code, event.extended);
+                if (this->key_up_sink_)
+                {
+                    this->key_up_sink_(event.vk, event.scan_code, event.extended, event.alt_context);
+                }
+                break;
+            case queued_input_event::kind::char_input:
+                this->emit_log("[ios-ui] delivering char 0x%04X", event.utf16_char);
+                if (this->char_sink_)
+                {
+                    this->char_sink_(event.utf16_char);
                 }
                 break;
             }

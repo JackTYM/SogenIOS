@@ -26,6 +26,10 @@ namespace sogen
         using raw_mouse_sink = std::function<void(int32_t dx, int32_t dy, uint16_t button_flags, uint16_t button_data)>;
         using mouse_move_sink = std::function<void(int32_t x, int32_t y)>;
         using mouse_button_sink = std::function<void(int32_t x, int32_t y, uint32_t message)>;
+        using key_down_sink =
+            std::function<void(uint16_t vk, uint8_t scan_code, bool extended, bool was_down, bool alt_context)>;
+        using key_up_sink = std::function<void(uint16_t vk, uint8_t scan_code, bool extended, bool alt_context)>;
+        using char_sink = std::function<void(uint16_t utf16_char)>;
         using log_sink = std::function<void(const char* line)>;
         using frame_size_sink = std::function<void(int32_t width, int32_t height)>;
         using cursor_visibility_sink = std::function<void(bool visible)>;
@@ -41,6 +45,9 @@ namespace sogen
         void set_raw_mouse_sink(raw_mouse_sink sink);
         void set_mouse_move_sink(mouse_move_sink sink);
         void set_mouse_button_sink(mouse_button_sink sink);
+        void set_key_down_sink(key_down_sink sink);
+        void set_key_up_sink(key_up_sink sink);
+        void set_char_sink(char_sink sink);
         void set_log_sink(log_sink sink);
         void set_frame_size_sink(frame_size_sink sink);
         void set_cursor_visibility_sink(cursor_visibility_sink sink);
@@ -55,6 +62,11 @@ namespace sogen
         void queue_mouse_move(int32_t x, int32_t y);
         void queue_mouse_button(int32_t x, int32_t y, uint32_t message);
 
+        // New keyboard queuing (hardware-keyboard and software-keyboard paths).
+        void queue_key_down(uint16_t vk, uint8_t scan_code, bool extended, bool was_down, bool alt_context);
+        void queue_key_up(uint16_t vk, uint8_t scan_code, bool extended, bool alt_context);
+        void queue_char(uint16_t utf16_char);
+
         uint64_t presented_frame_count() const;
 
       private:
@@ -68,6 +80,9 @@ namespace sogen
                 raw_delta,
                 absolute_move,
                 absolute_button,
+                key_down,
+                key_up,
+                char_input,
             } type;
             int32_t dx{};
             int32_t dy{};
@@ -76,6 +91,12 @@ namespace sogen
             int32_t x{};
             int32_t y{};
             uint32_t message{};
+            uint16_t vk{};
+            uint8_t scan_code{};
+            bool extended{};
+            bool was_down{};
+            bool alt_context{};
+            uint16_t utf16_char{};
         };
 
         CALayer* layer_{};
@@ -90,6 +111,9 @@ namespace sogen
         raw_mouse_sink raw_mouse_sink_{};
         mouse_move_sink mouse_move_sink_{};
         mouse_button_sink mouse_button_sink_{};
+        key_down_sink key_down_sink_{};
+        key_up_sink key_up_sink_{};
+        char_sink char_sink_{};
         log_sink log_sink_{};
         frame_size_sink frame_size_sink_{};
         cursor_visibility_sink cursor_visibility_sink_{};
