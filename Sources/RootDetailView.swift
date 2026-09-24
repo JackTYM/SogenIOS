@@ -123,7 +123,17 @@ struct RootDetailView: View {
             }
         }
         .navigationTitle(root.name)
-        .onAppear { reload() }
+        .onAppear {
+            reload()
+            // Also fires when popping back from EmulationView (its own back button already
+            // stopped that emulator instance) -- without this, bootedEmulator/bootAttempted
+            // stay set forever for the rest of this screen's visit, silently no-oping every
+            // subsequent tap on any shortcut in the list, including the one that just finished.
+            bootedEmulator = nil
+            bootAttempted = false
+            didBoot = false
+            launchingShortcut = nil
+        }
         .sheet(item: $editingShortcut) { shortcut in
             NavigationStack {
                 ShortcutEditorView(root: root, shortcut: shortcut) { saved in
@@ -217,6 +227,7 @@ struct RootDetailView: View {
                         case .tunnelNotInstalled:
                             appendLog("ERROR: unexpected tunnelNotInstalled on the Xcode-debugger bypass path")
                         case .failed(let message):
+                            bootAttempted = false
                             appendLog("ERROR: JIT grant failed (Xcode-debugger bypass path), " +
                                       "refusing to start the guest: \(message)")
                         }
@@ -246,6 +257,7 @@ struct RootDetailView: View {
                                       "tap \"Install LocalDevVPN\" below, install it from the App Store, " +
                                       "then tap \"Retry\"")
                         case .failed(let message):
+                            bootAttempted = false
                             appendLog("ERROR: JIT grant failed, refusing to start the guest " +
                                       "(it would crash on the first new Unicorn JIT translation): \(message)")
                         }
