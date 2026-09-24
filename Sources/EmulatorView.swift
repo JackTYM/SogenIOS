@@ -4,6 +4,7 @@ import SwiftUI
 enum MouseMode {
     case touchscreen
     case trackpad
+    case arcade
 }
 
 /// Hosts the guest's CALayer and translates touch gestures into guest mouse input, per the
@@ -19,6 +20,10 @@ final class EmulatorHostView: UIView {
     var mode: MouseMode = .touchscreen {
         didSet {
             panRecognizer.isEnabled = mode == .trackpad
+            let interactionEnabled = mode != .arcade
+            tap.isEnabled = interactionEnabled
+            twoFingerTap.isEnabled = interactionEnabled
+            longPress.isEnabled = interactionEnabled
             // The synthetic trackpad cursor has no meaningful position to remember from
             // touchscreen mode (which never moves it), so start it fresh each time trackpad
             // mode is entered, rather than carrying over a stale/default value.
@@ -43,16 +48,19 @@ final class EmulatorHostView: UIView {
     private let wmRButtonUp: UInt32 = 0x0205
 
     private let panRecognizer = UIPanGestureRecognizer()
+    private let tap = UITapGestureRecognizer()
+    private let twoFingerTap = UITapGestureRecognizer()
+    private let longPress = UILongPressGestureRecognizer()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
         layer.magnificationFilter = .nearest
 
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        tap.addTarget(self, action: #selector(handleTap))
         addGestureRecognizer(tap)
 
-        let twoFingerTap = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerTap))
+        twoFingerTap.addTarget(self, action: #selector(handleTwoFingerTap))
         twoFingerTap.numberOfTouchesRequired = 2
         addGestureRecognizer(twoFingerTap)
 
@@ -60,7 +68,7 @@ final class EmulatorHostView: UIView {
         panRecognizer.isEnabled = mode == .trackpad
         addGestureRecognizer(panRecognizer)
 
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
+        longPress.addTarget(self, action: #selector(handleLongPress))
         longPress.minimumPressDuration = 0.35
         addGestureRecognizer(longPress)
     }
@@ -124,6 +132,8 @@ final class EmulatorHostView: UIView {
             onDeliverButton?(guestPoint, wmLButtonUp)
         case .trackpad:
             onDeliverClick?()
+        case .arcade:
+            break
         }
     }
 
@@ -135,6 +145,8 @@ final class EmulatorHostView: UIView {
             onDeliverButton?(guestPoint, wmRButtonUp)
         case .trackpad:
             onDeliverRightClick?()
+        case .arcade:
+            break
         }
     }
 
@@ -159,6 +171,8 @@ final class EmulatorHostView: UIView {
                 onDeliverButton?(guestPoint, wmLButtonDown)
             case .trackpad:
                 onDeliverClick?()
+            case .arcade:
+                break
             }
         case .changed:
             if mode == .touchscreen {

@@ -4,6 +4,7 @@ import UIKit
 struct EmulationView: View {
     let emulator: SogenEmulator
     let logLines: [String]
+    let guestExecutableName: String
     @Environment(\.dismiss) private var dismiss
 
     @State private var mode: MouseMode = .touchscreen
@@ -13,6 +14,8 @@ struct EmulationView: View {
     @State private var cursorVisible = true
     @State private var cursorPosition: CGPoint = .zero
     @State private var keyboardObserver = HardwareKeyboardObserver()
+    @State private var activeArcadeProfile: ArcadeProfile?
+    @State private var showProfilePicker = false
 
     private var guestAspectRatio: CGFloat {
         guard frameSize.width > 0, frameSize.height > 0 else { return 320.0 / 180.0 }
@@ -77,23 +80,50 @@ struct EmulationView: View {
             keyboardObserver.onKeyUp = { vk, scanCode, extended, altContext in
                 emulator.deliverKeyUp(vk, scanCode: scanCode, extended: extended, altContext: altContext)
             }
+            activeArcadeProfile = ArcadeProfileStore.shared.activeProfile(forGuestExecutableName: guestExecutableName)
+        }
+        .sheet(isPresented: $showProfilePicker) {
+            List(ArcadeProfileStore.shared.profiles) { profile in
+                Button(profile.name) {
+                    activeArcadeProfile = profile
+                    ArcadeProfileStore.shared.setActiveProfile(profile.id, forGuestExecutableName: guestExecutableName)
+                    showProfilePicker = false
+                }
+            }
         }
     }
 
     private var guestView: some View {
-        EmulatorView(
-            onViewReady: { layer in
-                emulator.attach(layer)
-            },
-            mode: mode,
-            frameSize: frameSize,
-            onDeliverMove: { point in emulator.deliverMouseMove(point) },
-            onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
-            onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
-            onDeliverClick: { emulator.deliverTap() },
-            onDeliverRightClick: { emulator.deliverRightClick() },
-            onCursorPositionChange: { point in cursorPosition = point }
-        )
+        ZStack {
+            EmulatorView(
+                onViewReady: { layer in
+                    emulator.attach(layer)
+                },
+                mode: mode,
+                frameSize: frameSize,
+                onDeliverMove: { point in emulator.deliverMouseMove(point) },
+                onDeliverButton: { point, message in emulator.deliverMouseButton(point, message: message) },
+                onDeliverDelta: { dx, dy in emulator.deliverMouseDelta(dx, dy: dy) },
+                onDeliverClick: { emulator.deliverTap() },
+                onDeliverRightClick: { emulator.deliverRightClick() },
+                onCursorPositionChange: { point in cursorPosition = point }
+            )
+            if mode == .arcade, let profile = activeArcadeProfile {
+                ArcadeControlsView(
+                    profile: profile,
+                    onKeyDown: { vk, scanCode, extended in
+                        emulator.deliverKeyDown(vk, scanCode: scanCode, extended: extended, wasDown: false,
+                                                 altContext: false)
+                    },
+                    onKeyUp: { vk, scanCode, extended in
+                        emulator.deliverKeyUp(vk, scanCode: scanCode, extended: extended, altContext: false)
+                    },
+                    onMouseButton: { message in
+                        emulator.deliverMouseButton(cursorPosition, message: message)
+                    }
+                )
+            }
+        }
     }
 
     private var topBar: some View {
@@ -112,9 +142,14 @@ struct EmulationView: View {
 
             HStack(spacing: 6) {
                 Button(action: {
-                    mode = (mode == .touchscreen) ? .trackpad : .touchscreen
+                    switch mode {
+                    case .touchscreen: mode = .trackpad
+                    case .trackpad: mode = .arcade
+                    case .arcade: mode = .touchscreen
+                    }
                 }) {
-                    Image(systemName: mode == .touchscreen ? "hand.tap" : "cursorarrow.motionlines")
+                    Image(systemName: mode == .touchscreen ? "hand.tap"
+                          : mode == .trackpad ? "cursorarrow.motionlines" : "gamecontroller")
                         .padding(6)
                         .background(Color.black.opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -130,6 +165,14 @@ struct EmulationView: View {
                         .padding(6)
                         .background(Color.black.opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                if mode == .arcade {
+                    Button(action: { showProfilePicker = true }) {
+                        Image(systemName: "list.bullet")
+                            .padding(6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
                 }
             }
         }
