@@ -13,6 +13,7 @@ struct SetupView: View {
     @State private var bootedEmulator: SogenEmulator?
     @State private var didBoot = false
     @State private var everBooted = false
+    @State private var currentGuestResourceName = "native-gpu-clear-sample"
 
     // Neither SwiftUI's .fileImporter nor a directly-wrapped UIDocumentPickerViewController
     // respond to taps on real iPhone hardware under this app's Feather/ArcticSign resigning --
@@ -77,6 +78,10 @@ struct SetupView: View {
                     checkForPairingFile()
                 }
                 .padding(6)
+                NavigationLink("Controller Layouts") {
+                    ArcadeProfileListView()
+                }
+                .padding(6)
                 if everBooted {
                     Button("Boot Input Test") {
                         guard let layer = pendingLayer else { return }
@@ -124,7 +129,7 @@ struct SetupView: View {
         }
         .navigationDestination(isPresented: $didBoot) {
             if let emulator = bootedEmulator {
-                EmulationView(emulator: emulator, logLines: logLines)
+                EmulationView(emulator: emulator, logLines: logLines, guestExecutableName: currentGuestResourceName)
             }
         }
     }
@@ -305,6 +310,7 @@ struct SetupView: View {
 
     private func startEmulator(with layer: CALayer, guestResourceName: String = "native-gpu-clear-sample") {
         guard emulator == nil else { return }
+        currentGuestResourceName = guestResourceName
 
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let root = documents.appendingPathComponent("root").path
