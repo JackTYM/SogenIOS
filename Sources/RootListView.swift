@@ -28,6 +28,9 @@ struct RootListView: View {
                 creationLog = []
                 showingAddRoot = true
             }
+            NavigationLink("Controller Layouts") {
+                ArcadeProfileListView()
+            }
         }
         .navigationTitle("Emulation Roots")
         .sheet(isPresented: $showingAddRoot) {
