@@ -8,7 +8,7 @@ import Foundation
 final class EmulationRootCreator {
     private let log: (String) -> Void
     private let completion: (Result<EmulationRoot, Error>) -> Void
-    private var provisioner: EmulationRootProvisioner?
+    private var hasStarted = false
 
     init(log: @escaping (String) -> Void, completion: @escaping (Result<EmulationRoot, Error>) -> Void) {
         self.log = log
@@ -16,14 +16,22 @@ final class EmulationRootCreator {
     }
 
     func createFresh(named name: String) {
+        guard !hasStarted else { return }
+        hasStarted = true
+
         let root = RootStore.shared.addRoot(named: name)
         let destination = RootStore.shared.directoryURL(for: root)
 
+        // Not retained on self: EmulationRootProvisioner already keeps itself alive for the
+        // download's duration via its own URLSession(delegate: self, ...) retain, so this
+        // closure can capture self strongly with no risk of a self -> provisioner -> closure
+        // -> self reference cycle. A weak capture here would silently orphan an already-
+        // registered-but-unprovisioned root in RootStore if the caller drops its reference
+        // to this creator mid-download (e.g. navigating away).
         let provisioner = EmulationRootProvisioner(
             destinationRoot: destination,
             log: log,
-            completion: { [weak self] result in
-                guard let self else { return }
+            completion: { result in
                 switch result {
                 case .success:
                     self.seedSamples(into: root)
@@ -33,11 +41,13 @@ final class EmulationRootCreator {
                     self.completion(.failure(error))
                 }
             })
-        self.provisioner = provisioner
         provisioner.start()
     }
 
     func duplicate(_ sourceRoot: EmulationRoot, named name: String) {
+        guard !hasStarted else { return }
+        hasStarted = true
+
         let root = RootStore.shared.addRoot(named: name)
         let destination = RootStore.shared.directoryURL(for: root)
         let source = RootStore.shared.directoryURL(for: sourceRoot)
@@ -58,8 +68,8 @@ final class EmulationRootCreator {
                     self.completion(.success(root))
                 }
             } catch {
-                RootStore.shared.deleteRoot(root.id)
                 DispatchQueue.main.async {
+                    RootStore.shared.deleteRoot(root.id)
                     self.completion(.failure(error))
                 }
             }
@@ -78,7 +88,12 @@ final class EmulationRootCreator {
                 continue
             }
             let destination = filesysC.appendingPathComponent("\(sample).exe")
-            try? fm.copyItem(atPath: bundlePath, toPath: destination.path)
+            do {
+                try fm.copyItem(atPath: bundlePath, toPath: destination.path)
+            } catch {
+                log("ERROR: failed to seed \(sample).exe: \(error.localizedDescription)")
+                continue
+            }
 
             let shortcut = GameShortcut(
                 id: UUID(), rootID: root.id, displayName: sample, exeRelativePath: "\(sample).exe",
