@@ -92,6 +92,13 @@
         [self appendLog:[NSString stringWithFormat:@"ERROR: guest executable missing at %@", _guestExecutablePath]];
         return NO;
     }
+    NSString* filesysCPrefix = [_emulationRoot stringByAppendingPathComponent:@"filesys/c"];
+    if (![_guestExecutablePath hasPrefix:filesysCPrefix])
+    {
+        [self appendLog:[NSString stringWithFormat:@"ERROR: guest executable %@ is not under %@",
+                                                    _guestExecutablePath, filesysCPrefix]];
+        return NO;
+    }
     return YES;
 }
 
@@ -139,17 +146,17 @@
             // The guest .exe already lives under <emulationRoot>/filesys/c/..., so its
             // guest-side path is derived by stripping that prefix -- no path_mappings redirect
             // needed, the normal emulation_root-backed lookup finds it.
-            NSString* filesysCPrefix = [strongSelf->_emulationRoot stringByAppendingPathComponent:@"filesys/c"];
+            NSString* filesysCPrefix = [root stringByAppendingPathComponent:@"filesys/c"];
             NSString* guestRelative = guest;
             if ([guest hasPrefix:filesysCPrefix])
             {
                 guestRelative = [guest substringFromIndex:filesysCPrefix.length];
             }
             NSString* windowsRelative = [guestRelative stringByReplacingOccurrencesOfString:@"/" withString:@"\\"];
-            const std::string applicationPath = "c:" + std::string(windowsRelative.UTF8String);
+            const std::string application_path = "c:" + std::string(windowsRelative.UTF8String);
 
             sogen::application_settings app_settings{};
-            app_settings.application = sogen::windows_path(applicationPath);
+            app_settings.application = sogen::windows_path(application_path);
             for (NSString* arg in strongSelf->_arguments)
             {
                 app_settings.arguments.push_back(sogen::u8_to_u16(arg.UTF8String));

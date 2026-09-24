@@ -83,16 +83,16 @@ Two Xcode targets exist, both built from the same `Sources/`:
   `#if targetEnvironment(simulator)` branch skips the whole JIT-grant flow at runtime, since the
   Simulator has no TXM/SPTM enforcement and Unicorn's/FEX's `mmap(PROT_EXEC)` just works there.
 
-Independently of the target, `project.yml`'s `settings.base.GCC_PREPROCESSOR_DEFINITIONS`
-(currently `["SOGEN_IOS_USE_FEX=1"]`) picks which backend `SogenBridge.mm` constructs:
+Independently of the target, `SogenEmulator`'s `useFEX` initializer parameter picks which backend
+`SogenBridge.mm` constructs at runtime -- both backends are always linked in, so this is a plain
+per-launch choice, not a build-time toggle:
 
-- **FEX** (`SOGEN_IOS_USE_FEX=1`, the current default) -- used for the real-device build; TSO
-  memory-ordering emulation is disabled for it on-device (`EMULATOR_FEX_NO_TSO=1`) to avoid a
-  misaligned-atomic fault class real hardware can't recover from.
-- **Unicorn** (remove/clear the define) -- the original backend; also fine on the Simulator.
+- **FEX** (`useFEX: true`) -- used for the real-device build; TSO memory-ordering emulation is
+  disabled for it on-device (`EMULATOR_FEX_NO_TSO=1`) to avoid a misaligned-atomic fault class
+  real hardware can't recover from.
+- **Unicorn** (`useFEX: false`) -- the original backend; also fine on the Simulator.
 
-Edit that one line in `project.yml` and re-run `xcodegen generate` to switch backends. The
-on-screen log always reports which one is active (`[sogen] backend: fex` / `unicorn`).
+The on-screen log always reports which one is active (`[sogen] backend: fex` / `unicorn`).
 
 ## Build (Simulator)
 
