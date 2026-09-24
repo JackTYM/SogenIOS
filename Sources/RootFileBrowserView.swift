@@ -1,12 +1,15 @@
 import SwiftUI
 
 /// A simple, read-only directory browser rooted at a root's filesys/c/ tree. In picker mode
-/// (onPickExecutable set), tapping a .exe file calls back with its path relative to `rootURL`
-/// and dismisses; otherwise it's plain browsing (e.g. "Browse Files" from RootDetailView).
+/// (onPickExecutable set), tapping a .exe file calls back with its path relative to `rootURL`;
+/// otherwise it's plain browsing (e.g. "Browse Files" from RootDetailView). Deliberately doesn't
+/// call `dismiss()` itself: a tap can arrive several NavigationLink pushes deep inside the
+/// caller's own presented sheet, and `dismiss()` there would only pop one level of that stack,
+/// not close the whole sheet. The caller's `onPickExecutable` closure should flip its own
+/// sheet's `isPresented` binding to actually close it, regardless of how deep the user browsed.
 struct RootFileBrowserView: View {
     let rootURL: URL
     var onPickExecutable: ((String) -> Void)?
-    @Environment(\.dismiss) private var dismiss
 
     @State private var currentDirectory: URL
     @State private var entries: [URL] = []
@@ -30,7 +33,6 @@ struct RootFileBrowserView: View {
                     guard onPickExecutable != nil, isExecutable else { return }
                     let relative = String(entry.path.dropFirst(rootURL.path.count + 1))
                     onPickExecutable?(relative)
-                    dismiss()
                 }
                 .foregroundColor(isExecutable ? .primary : .secondary)
             }
