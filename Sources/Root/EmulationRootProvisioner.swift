@@ -15,25 +15,26 @@ enum EmulationRootProvisionError: Error, CustomStringConvertible {
 }
 
 // Downloads the upstream sogen project's ready-made emulation root (documented in the repo's
-// root/README.md) so the app doesn't need it side-loaded over USB, then extracts it into
-// <Documents>/root. Extraction lands in a scratch directory first and is only moved into place
-// once it fully succeeds, so a failed attempt never leaves a half-extracted root that a later
-// `filesys`+`registry` presence check would mistake for a real one.
+// root/README.md) so the app doesn't need it side-loaded over USB, then extracts it into the
+// caller-supplied destinationRoot. Extraction lands in a scratch directory first and is only
+// moved into place once it fully succeeds, so a failed attempt never leaves a half-extracted
+// root that a later `filesys`+`registry` presence check would mistake for a real one.
 final class EmulationRootProvisioner: NSObject, URLSessionDownloadDelegate {
     static let rootZipURL = URL(string: "https://sogen.dev/root.zip")!
 
+    private let destinationRoot: URL
     private let log: (String) -> Void
     private let completion: (Result<Void, Error>) -> Void
     private var lastLoggedBucket = -1
     private var session: URLSession?
 
-    init(log: @escaping (String) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+    init(destinationRoot: URL, log: @escaping (String) -> Void, completion: @escaping (Result<Void, Error>) -> Void) {
+        self.destinationRoot = destinationRoot
         self.log = log
         self.completion = completion
     }
 
-    static func isRootPresent(documents: URL) -> Bool {
-        let root = documents.appendingPathComponent("root")
+    static func isRootPresent(at root: URL) -> Bool {
         let fm = FileManager.default
 
         var isDirectory: ObjCBool = false
@@ -116,9 +117,9 @@ final class EmulationRootProvisioner: NSObject, URLSessionDownloadDelegate {
     }
 
     private func extractAndInstall(zipPath: URL) throws {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let finalRoot = documents.appendingPathComponent("root")
-        let stagingRoot = documents.appendingPathComponent("root.download-\(UUID().uuidString)")
+        let finalRoot = destinationRoot
+        let stagingRoot = finalRoot.deletingLastPathComponent()
+            .appendingPathComponent("\(finalRoot.lastPathComponent).download-\(UUID().uuidString)")
 
         try ZipExtractor.extract(
             zipFileURL: zipPath,
