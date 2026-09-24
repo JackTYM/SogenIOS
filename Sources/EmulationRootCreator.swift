@@ -73,7 +73,10 @@ final class EmulationRootCreator {
 
         let samples = ["native-gpu-clear-sample", "mouse-input-test-sample"]
         for sample in samples {
-            guard let bundlePath = Bundle.main.path(forResource: sample, ofType: "exe") else { continue }
+            guard let bundlePath = Bundle.main.path(forResource: sample, ofType: "exe") else {
+                log("ERROR: \(sample).exe is not in the app bundle, skipping seeding it")
+                continue
+            }
             let destination = filesysC.appendingPathComponent("\(sample).exe")
             try? fm.copyItem(atPath: bundlePath, toPath: destination.path)
 
