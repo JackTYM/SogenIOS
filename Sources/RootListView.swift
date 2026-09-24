@@ -73,6 +73,7 @@ struct RootListView: View {
     }
 
     private func createRoot() {
+        guard !isCreating else { return }
         isCreating = true
         creationLog = []
         let name = newRootName
