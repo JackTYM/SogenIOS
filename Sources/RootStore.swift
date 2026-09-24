@@ -38,17 +38,35 @@ final class RootStore {
 
     /// Sanitizes a name into a filesystem-safe folder name, appending a numeric suffix on
     /// collision so Documents/Roots/<folder>/ stays unique and human-readable in the Files app.
+    /// Checks both the in-memory roots list AND the real filesystem (APFS is case-insensitive,
+    /// and a directory can be orphaned on disk with no in-memory root at all if a prior
+    /// deleteRoot's best-effort removeItem silently failed) -- excludingRootID's own current
+    /// folder is skipped in both checks so renaming a root back to its own name isn't treated
+    /// as a collision with itself.
     private func availableFolderName(for name: String, excludingRootID: UUID?) -> String {
+        let excludedFolderName = roots.first(where: { $0.id == excludingRootID })?.folderName
+
         let sanitized = name.replacingOccurrences(of: "/", with: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let base = sanitized.isEmpty ? "Root" : sanitized
         var candidate = base
         var suffix = 2
-        while roots.contains(where: { $0.id != excludingRootID && $0.folderName == candidate }) {
+        while isFolderNameTaken(candidate, excludingRootID: excludingRootID, excludingFolderName: excludedFolderName) {
             candidate = "\(base) \(suffix)"
             suffix += 1
         }
         return candidate
+    }
+
+    private func isFolderNameTaken(_ candidate: String, excludingRootID: UUID?, excludingFolderName: String?) -> Bool {
+        if candidate.caseInsensitiveCompare(excludingFolderName ?? "") == .orderedSame {
+            return false
+        }
+        let inMemoryCollision = roots.contains {
+            $0.id != excludingRootID && $0.folderName.caseInsensitiveCompare(candidate) == .orderedSame
+        }
+        let onDiskCollision = FileManager.default.fileExists(atPath: rootsDirectory.appendingPathComponent(candidate).path)
+        return inMemoryCollision || onDiskCollision
     }
 
     func directoryURL(for root: EmulationRoot) -> URL {
@@ -60,8 +78,9 @@ final class RootStore {
     }
 
     func addRoot(named name: String) -> EmulationRoot {
-        let folderName = availableFolderName(for: name, excludingRootID: nil)
-        let root = EmulationRoot(id: UUID(), name: name, folderName: folderName, createdAt: Date())
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let folderName = availableFolderName(for: trimmedName, excludingRootID: nil)
+        let root = EmulationRoot(id: UUID(), name: trimmedName, folderName: folderName, createdAt: Date())
         roots.append(root)
         save()
         return root
@@ -69,13 +88,14 @@ final class RootStore {
 
     func renameRoot(_ rootID: UUID, to newName: String) throws {
         guard let index = roots.firstIndex(where: { $0.id == rootID }) else { return }
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         let oldURL = directoryURL(for: roots[index])
-        let newFolderName = availableFolderName(for: newName, excludingRootID: rootID)
+        let newFolderName = availableFolderName(for: trimmedName, excludingRootID: rootID)
         let newURL = rootsDirectory.appendingPathComponent(newFolderName)
         if FileManager.default.fileExists(atPath: oldURL.path) {
             try FileManager.default.moveItem(at: oldURL, to: newURL)
         }
-        roots[index].name = newName
+        roots[index].name = trimmedName
         roots[index].folderName = newFolderName
         save()
     }
