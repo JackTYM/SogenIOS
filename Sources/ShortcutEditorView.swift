@@ -75,7 +75,9 @@ struct ShortcutEditorView: View {
         for line in environmentText.split(separator: "\n") {
             let parts = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
             if parts.count == 2 {
-                env[String(parts[0])] = String(parts[1])
+                let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                env[key] = value
             }
         }
         shortcut.environment = env
