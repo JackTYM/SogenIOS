@@ -73,7 +73,7 @@ struct ShortcutEditorView: View {
         shortcut.arguments = argumentsText.split(separator: " ").map(String.init)
         var env: [String: String] = [:]
         for line in environmentText.split(separator: "\n") {
-            let parts = line.split(separator: "=", maxSplits: 1)
+            let parts = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
             if parts.count == 2 {
                 env[String(parts[0])] = String(parts[1])
             }
