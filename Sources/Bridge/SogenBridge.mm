@@ -3,6 +3,7 @@
 
 #include <windows_emulator.hpp>
 #include <backend_selection.hpp>
+#include <platform/unicode.hpp>
 #include <utils/ios_device_log.hpp>
 
 #include <TargetConditionals.h>
@@ -18,6 +19,9 @@
     std::thread _runThread;
     NSString* _emulationRoot;
     NSString* _guestExecutablePath;
+    NSArray<NSString *>* _arguments;
+    NSDictionary<NSString *, NSString *>* _environment;
+    BOOL _useFEX;
     CALayer* _layer;
     // The guest's CRT stdio implementation writes one byte per NtWriteFile syscall, so on_stdout
     // below accumulates chunks here and only calls appendLog: once a complete line has arrived.
@@ -27,6 +31,9 @@
 - (instancetype)initWithLayer:(CALayer *)layer
                 emulationRoot:(NSString *)emulationRoot
           guestExecutablePath:(NSString *)guestExecutablePath
+                    arguments:(NSArray<NSString *> *)arguments
+                  environment:(NSDictionary<NSString *, NSString *> *)environment
+                       useFEX:(BOOL)useFEX
 {
     self = [super init];
     if (self)
@@ -34,6 +41,9 @@
         _layer = layer;
         _emulationRoot = [emulationRoot copy];
         _guestExecutablePath = [guestExecutablePath copy];
+        _arguments = [arguments copy];
+        _environment = [environment copy];
+        _useFEX = useFEX;
         _ui = nullptr;
         _stdoutLineBuffer = [NSMutableString string];
     }
@@ -125,13 +135,30 @@
 
             sogen::emulator_settings settings{};
             settings.emulation_root = std::filesystem::path(root.UTF8String);
-            // The guest .exe ships in the app bundle (read-only), not inside the provisioned
-            // emulation root, so map its guest path straight at the bundle resource.
-            settings.path_mappings[sogen::windows_path("c:/native-gpu-clear-sample.exe")] =
-                std::filesystem::path(guest.UTF8String);
+
+            // The guest .exe already lives under <emulationRoot>/filesys/c/..., so its
+            // guest-side path is derived by stripping that prefix -- no path_mappings redirect
+            // needed, the normal emulation_root-backed lookup finds it.
+            NSString* filesysCPrefix = [strongSelf->_emulationRoot stringByAppendingPathComponent:@"filesys/c"];
+            NSString* guestRelative = guest;
+            if ([guest hasPrefix:filesysCPrefix])
+            {
+                guestRelative = [guest substringFromIndex:filesysCPrefix.length];
+            }
+            NSString* windowsRelative = [guestRelative stringByReplacingOccurrencesOfString:@"/" withString:@"\\"];
+            const std::string applicationPath = "c:" + std::string(windowsRelative.UTF8String);
 
             sogen::application_settings app_settings{};
-            app_settings.application = sogen::windows_path("c:/native-gpu-clear-sample.exe");
+            app_settings.application = sogen::windows_path(applicationPath);
+            for (NSString* arg in strongSelf->_arguments)
+            {
+                app_settings.arguments.push_back(sogen::u8_to_u16(arg.UTF8String));
+            }
+            for (NSString* key in strongSelf->_environment)
+            {
+                NSString* value = strongSelf->_environment[key];
+                app_settings.environment[sogen::u8_to_u16(key.UTF8String)] = sogen::u8_to_u16(value.UTF8String);
+            }
 
             sogen::emulator_callbacks callbacks{};
             callbacks.on_stdout = [weakSelf](const std::string_view data) {
@@ -166,21 +193,20 @@
                 }
             };
 
-#if defined(SOGEN_IOS_USE_FEX) && TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
             // FEX's TSO memory-ordering modeling emits misaligned STLR/LDAR atomics that fault
             // on real ARM64 hardware; those faults can't be delivered correctly on this device
             // (see the JIT26-debugger-swallows-hardware-exceptions notes elsewhere in
             // fex_x86_64_emulator.cpp). Disabling TSO modeling makes FEX emit plain LDR/STR
             // instead, which don't fault on misalignment, eliminating this whole fault class.
-            setenv("EMULATOR_FEX_NO_TSO", "1", 1);
+            if (strongSelf->_useFEX)
+            {
+                setenv("EMULATOR_FEX_NO_TSO", "1", 1);
+            }
 #endif
 
             sogen::utils::log_ios_device_milestone("[milestone] before create_x86_64_emulator");
-#if defined(SOGEN_IOS_USE_FEX)
-            const auto backend = sogen::backend_type::fex;
-#else
-            const auto backend = sogen::backend_type::unicorn;
-#endif
+            const auto backend = strongSelf->_useFEX ? sogen::backend_type::fex : sogen::backend_type::unicorn;
             auto emu = sogen::create_x86_64_emulator(backend, 1);
             sogen::utils::log_ios_device_milestone("[milestone] after create_x86_64_emulator");
             [weakSelf appendLog:(backend == sogen::backend_type::fex) ? @"[sogen] backend: fex" : @"[sogen] backend: unicorn"];

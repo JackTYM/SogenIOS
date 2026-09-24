@@ -70,13 +70,9 @@ targets:
         CLANG_CXX_LANGUAGE_STANDARD: "c++20"
         CLANG_CXX_LIBRARY: "libc++"
         CLANG_ENABLE_OBJC_ARC: YES
-        # Developer toggle: construct the FEX backend instead of Unicorn in SogenBridge.mm
-        # (see SOGEN_IOS_USE_FEX there). Enabled for the Phase 2 real-device demo build.
-        #
         # Self-signed/sideload builds: add "SOGEN_IOS_USE_LOCALDEVVPN" to SWIFT_ACTIVE_COMPILATION_
         # CONDITIONS below, and comment out the TunnelExtension dependency above -- see that
         # dependency's own comment and docs/superpowers/specs/2026-09-16-ios-localdevvpn-design.md.
-        GCC_PREPROCESSOR_DEFINITIONS: ["SOGEN_IOS_USE_FEX=1"]
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: ["SOGEN_IOS_USE_LOCALDEVVPN"]
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Bridging-Header.h
         # The static archives are LTO-free plain Mach-O (see the ios-embed presets), but the

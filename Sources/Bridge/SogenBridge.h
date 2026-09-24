@@ -7,12 +7,18 @@ NS_ASSUME_NONNULL_BEGIN
 /// the emulator itself runs on a private background thread owned by this object.
 @interface SogenEmulator : NSObject
 
-/// `layer` receives every frame the guest presents. `emulationRoot` is the directory holding
-/// filesys/ and registry/. `guestExecutablePath` is the host path of the bundled .exe, which is
-/// mapped into the guest as c:\native-gpu-clear-sample.exe.
+/// `layer` receives every frame the guest presents. `emulationRoot` is the root directory
+/// holding filesys/ and registry/. `guestExecutablePath` is the real host path of the guest
+/// .exe, which must live under `<emulationRoot>/filesys/c/...` -- its guest-side path is
+/// derived by stripping that prefix, with no path-mapping redirect. `arguments`/`environment`
+/// are passed straight to the guest process. `useFEX` selects the FEX backend at runtime
+/// instead of Unicorn (both are already linked into every build).
 - (instancetype)initWithLayer:(CALayer *)layer
                 emulationRoot:(NSString *)emulationRoot
-          guestExecutablePath:(NSString *)guestExecutablePath NS_DESIGNATED_INITIALIZER;
+          guestExecutablePath:(NSString *)guestExecutablePath
+                    arguments:(NSArray<NSString *> *)arguments
+                  environment:(NSDictionary<NSString *, NSString *> *)environment
+                       useFEX:(BOOL)useFEX NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
