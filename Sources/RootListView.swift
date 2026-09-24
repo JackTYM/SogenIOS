@@ -8,6 +8,9 @@ struct RootListView: View {
     @State private var creator: EmulationRootCreator?
     @State private var creationLog: [String] = []
     @State private var isCreating = false
+    @State private var renamingRootID: UUID?
+    @State private var renameText = ""
+    @State private var renameError: String?
 
     var body: some View {
         List {
@@ -19,6 +22,10 @@ struct RootListView: View {
                     Button("Delete", role: .destructive) {
                         RootStore.shared.deleteRoot(root.id)
                         roots = RootStore.shared.roots
+                    }
+                    Button("Rename") {
+                        renameText = root.name
+                        renamingRootID = root.id
                     }
                 }
             }
@@ -35,6 +42,33 @@ struct RootListView: View {
         .navigationTitle("Emulation Roots")
         .sheet(isPresented: $showingAddRoot) {
             addRootSheet
+        }
+        .alert("Rename Root", isPresented: Binding(
+            get: { renamingRootID != nil },
+            set: { if !$0 { renamingRootID = nil } }
+        )) {
+            TextField("Root Name", text: $renameText)
+            Button("Cancel", role: .cancel) { renamingRootID = nil }
+            Button("Rename") { performRename() }
+        }
+        .alert("Rename Failed", isPresented: Binding(
+            get: { renameError != nil },
+            set: { if !$0 { renameError = nil } }
+        )) {
+            Button("OK", role: .cancel) { renameError = nil }
+        } message: {
+            Text(renameError ?? "")
+        }
+    }
+
+    private func performRename() {
+        guard let rootID = renamingRootID else { return }
+        renamingRootID = nil
+        do {
+            try RootStore.shared.renameRoot(rootID, to: renameText)
+            roots = RootStore.shared.roots
+        } catch {
+            renameError = error.localizedDescription
         }
     }
 
