@@ -24,8 +24,6 @@ namespace sogen
     {
       public:
         using raw_mouse_sink = std::function<void(int32_t dx, int32_t dy, uint16_t button_flags, uint16_t button_data)>;
-        using mouse_move_sink = std::function<void(int32_t x, int32_t y)>;
-        using mouse_button_sink = std::function<void(int32_t x, int32_t y, uint32_t message)>;
         using key_down_sink =
             std::function<void(uint16_t vk, uint8_t scan_code, bool extended, bool was_down, bool alt_context)>;
         using key_up_sink = std::function<void(uint16_t vk, uint8_t scan_code, bool extended, bool alt_context)>;
@@ -43,8 +41,6 @@ namespace sogen
         void set_cursor_visibility(bool visible) override;
 
         void set_raw_mouse_sink(raw_mouse_sink sink);
-        void set_mouse_move_sink(mouse_move_sink sink);
-        void set_mouse_button_sink(mouse_button_sink sink);
         void set_key_down_sink(key_down_sink sink);
         void set_key_up_sink(key_up_sink sink);
         void set_char_sink(char_sink sink);
@@ -109,8 +105,6 @@ namespace sogen
         CGImageRef last_image_{};
         event_sink event_sink_{};
         raw_mouse_sink raw_mouse_sink_{};
-        mouse_move_sink mouse_move_sink_{};
-        mouse_button_sink mouse_button_sink_{};
         key_down_sink key_down_sink_{};
         key_up_sink key_up_sink_{};
         char_sink char_sink_{};
@@ -123,5 +117,9 @@ namespace sogen
         uint64_t presented_frames_{};
         int32_t last_frame_width_{};
         int32_t last_frame_height_{};
+        // The window last presented to the layer -- route_pointer's hit-testing target for queued
+        // touchscreen-mode move/button events, so a click lands on whichever child control (e.g. a
+        // dialog's button) is actually at that point instead of always hitting the top-level window.
+        hwnd last_presented_window_{};
     };
 }

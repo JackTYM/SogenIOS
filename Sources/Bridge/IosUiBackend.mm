@@ -16,6 +16,13 @@ namespace sogen
         {
             std::free(const_cast<void*>(data));
         }
+
+        // Matches the WM_MOUSEMOVE/WM_*BUTTON* lParam packing every other backend and handle_ui_event
+        // agree on: y in the high word, x in the low word.
+        uint64_t pack_xy(const int32_t x, const int32_t y)
+        {
+            return (static_cast<uint32_t>(y) << 16) | (static_cast<uint32_t>(x) & 0xFFFFu);
+        }
     }
 
     ios_ui_backend::ios_ui_backend(CALayer* layer)
@@ -39,16 +46,6 @@ namespace sogen
     void ios_ui_backend::set_raw_mouse_sink(raw_mouse_sink sink)
     {
         this->raw_mouse_sink_ = std::move(sink);
-    }
-
-    void ios_ui_backend::set_mouse_move_sink(mouse_move_sink sink)
-    {
-        this->mouse_move_sink_ = std::move(sink);
-    }
-
-    void ios_ui_backend::set_mouse_button_sink(mouse_button_sink sink)
-    {
-        this->mouse_button_sink_ = std::move(sink);
     }
 
     void ios_ui_backend::set_key_down_sink(key_down_sink sink)
@@ -240,17 +237,24 @@ namespace sogen
                 break;
             case queued_input_event::kind::absolute_move:
                 this->emit_log("[ios-ui] delivering positioned mouse move x=%d y=%d", event.x, event.y);
-                if (this->mouse_move_sink_)
+                if (this->event_sink_ && this->last_presented_window_ != 0)
                 {
-                    this->mouse_move_sink_(event.x, event.y);
+                    constexpr uint32_t wm_mousemove = 0x0200;
+                    this->event_sink_(ui_event{.window = this->last_presented_window_,
+                                                .message = wm_mousemove,
+                                                .wParam = 0,
+                                                .lParam = pack_xy(event.x, event.y)});
                 }
                 break;
             case queued_input_event::kind::absolute_button:
                 this->emit_log("[ios-ui] delivering positioned mouse button message=0x%04X x=%d y=%d", event.message,
                                event.x, event.y);
-                if (this->mouse_button_sink_)
+                if (this->event_sink_ && this->last_presented_window_ != 0)
                 {
-                    this->mouse_button_sink_(event.x, event.y, event.message);
+                    this->event_sink_(ui_event{.window = this->last_presented_window_,
+                                                .message = event.message,
+                                                .wParam = 0,
+                                                .lParam = pack_xy(event.x, event.y)});
                 }
                 break;
             case queued_input_event::kind::key_down:
@@ -328,6 +332,7 @@ namespace sogen
             size_changed = surface.width != this->last_frame_width_ || surface.height != this->last_frame_height_;
             this->last_frame_width_ = surface.width;
             this->last_frame_height_ = surface.height;
+            this->last_presented_window_ = window;
         }
 
         if (size_changed && this->frame_size_sink_)

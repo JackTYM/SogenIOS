@@ -238,12 +238,6 @@
                 [emulator_ptr](const int32_t dx, const int32_t dy, const uint16_t flags, const uint16_t data) {
                     emulator_ptr->deliver_raw_mouse_input(dx, dy, flags, data);
                 });
-            ui_raw->set_mouse_move_sink([emulator_ptr](const int32_t x, const int32_t y) {
-                emulator_ptr->deliver_mouse_move(x, y);
-            });
-            ui_raw->set_mouse_button_sink([emulator_ptr](const int32_t x, const int32_t y, const uint32_t message) {
-                emulator_ptr->deliver_mouse_button(x, y, message);
-            });
             ui_raw->set_key_down_sink([emulator_ptr](const uint16_t vk, const uint8_t scan_code,
                                                        const bool extended, const bool was_down,
                                                        const bool alt_context) {
