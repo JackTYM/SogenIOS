@@ -31,7 +31,8 @@ struct RootFileBrowserView: View {
                 let isExecutable = entry.pathExtension.lowercased() == "exe"
                 Button(entry.lastPathComponent) {
                     guard onPickExecutable != nil, isExecutable else { return }
-                    let relative = String(entry.path.dropFirst(rootURL.path.count + 1))
+                    let rootPath = rootURL.resolvingSymlinksInPath().path
+                    let relative = String(entry.resolvingSymlinksInPath().path.dropFirst(rootPath.count + 1))
                     onPickExecutable?(relative)
                 }
                 .foregroundColor(isExecutable ? .primary : .secondary)
