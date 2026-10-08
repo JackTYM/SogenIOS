@@ -16,9 +16,18 @@ final class JITProgressBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var lines: [String] = []
 
+    private lazy var logFile: UnsafeMutablePointer<FILE>? = {
+        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        return fopen(dir.appendingPathComponent("jit_progress.txt").path, "a")
+    }()
+
     func append(_ line: String) {
         lock.lock()
         lines.append(line)
+        if let file = logFile {
+            fputs(line + "\n", file)
+            fflush(file)
+        }
         lock.unlock()
     }
 

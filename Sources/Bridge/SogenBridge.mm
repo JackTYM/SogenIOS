@@ -285,6 +285,16 @@
             sogen::utils::log_ios_device_milestone("[milestone] before windows_emulator::start()");
             strongSelf->_emulator->start();
             sogen::utils::log_ios_device_milestone("[milestone] after windows_emulator::start()");
+            const auto exitStatus = strongSelf->_emulator->process.exit_status;
+            if (exitStatus.has_value())
+            {
+                sogen::utils::log_ios_device_milestone(
+                    std::string("[milestone] guest exit status: 0x") + [[NSString stringWithFormat:@"%08X", static_cast<unsigned>(*exitStatus)] UTF8String]);
+            }
+            else
+            {
+                sogen::utils::log_ios_device_milestone("[milestone] guest exit status: none (stopped without terminating)");
+            }
             [weakSelf appendLog:@"[sogen] guest run finished"];
         }
         catch (const std::exception& e)
